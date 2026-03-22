@@ -1,93 +1,199 @@
 "use client";
 
-import { uploadProfilePhoto } from "@/lib/actions/profile";
-import { useRef, useState } from "react";
+import { useState, useCallback } from "react";
+import Cropper from "react-easy-crop";
+import { createClient } from "@/lib/supabase/client";
 
 export default function PhotoUpload({
   onPhotoUploaded,
+  onUploadStart,
 }: {
   onPhotoUploaded: (url: string) => void;
+  onUploadStart?: () => void;
 }) {
-  const [uploading, setUploading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const supabase = createClient();
 
-  async function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+
+  // 📸 Select file (FIXED)
+  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select an image file");
-      return;
+    // 🔥 FIX: use FileReader instead of createObjectURL
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageSrc(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 🎯 Save crop
+  const onCropComplete = useCallback((_: any, croppedPixels: any) => {
+    setCroppedAreaPixels(croppedPixels);
+  }, []);
+
+  // ✂️ Crop image (ANDROID SAFE)
+  async function getCroppedImage(): Promise<Blob> {
+    if (!imageSrc || !croppedAreaPixels) {
+      throw new Error("Missing crop data");
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError("File size must be less than 5MB");
-      return;
-    }
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.src = imageSrc;
 
-    setUploading(true);
-    setError(null);
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = reject;
+    });
 
-    try {
-      const result = await uploadProfilePhoto(file);
-      if (result.success && result.url) {
-        onPhotoUploaded(result.url);
-        setError(null);
-      } else {
-        setError(result.error ?? "Failed to upload photo.");
-      }
-    } catch (err) {
-      setError("Failed to change photo");
-    } finally {
-      setUploading(false);
-    }
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) throw new Error("Canvas failed");
+
+    canvas.width = croppedAreaPixels.width;
+    canvas.height = croppedAreaPixels.height;
+
+    ctx.drawImage(
+      image,
+      croppedAreaPixels.x,
+      croppedAreaPixels.y,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+      0,
+      0,
+      croppedAreaPixels.width,
+      croppedAreaPixels.height,
+    );
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("toBlob failed"));
+            return;
+          }
+          resolve(blob);
+        },
+        "image/jpeg",
+        0.9,
+      );
+    });
   }
 
-  function handleClick() {
-    fileInputRef.current?.click();
+  // 🚀 Upload
+  async function handleUpload() {
+    if (!imageSrc || !croppedAreaPixels) return;
+
+    onUploadStart?.();
+
+    try {
+      console.log("Starting crop...");
+
+      const blob = await getCroppedImage();
+
+      console.log("Blob created:", blob);
+
+      const file = new File([blob], "avatar.jpg", {
+        type: "image/jpeg",
+      });
+
+      const fileName = `${Date.now()}-${Math.random()}.jpg`;
+
+      console.log("Uploading...");
+
+      const { data, error } = await supabase.storage
+        .from("profile-photos")
+        .upload(fileName, file);
+
+      if (error) {
+        console.error("UPLOAD ERROR:", error);
+        alert(error.message);
+        return;
+      }
+
+      const { data: publicData } = supabase.storage
+        .from("profile-photos")
+        .getPublicUrl(data.path);
+
+      const publicUrl = publicData.publicUrl;
+
+      console.log("Upload success:", publicUrl);
+
+      onPhotoUploaded(publicUrl);
+
+      setImageSrc(null);
+    } catch (err) {
+      console.error("UPLOAD FAILED:", err);
+      alert("Upload failed. Try again.");
+    }
   }
 
   return (
-    <div className="absolute bottom-0 right-0">
+    <div>
+      {/* FILE INPUT */}
       <input
-        ref={fileInputRef}
         type="file"
         accept="image/*"
-        className="hidden"
-        onChange={handleFileSelect}
+        onChange={onSelectFile} // ✅ no capture → normal picker
       />
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={uploading}
-        className="absolute bottom-0 right-0 bg-pink-500 text-white p-2 rounded-full hover:bg-pink-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Change photo"
-      >
-        {uploading ? (
-          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-        ) : (
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+
+      {/* CROP MODAL */}
+      {imageSrc && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-black p-4 rounded-xl w-[90%] max-w-md">
+            <div className="relative w-full h-80">
+              <Cropper
+                image={imageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onCropComplete={onCropComplete}
+              />
+            </div>
+
+            {/* ZOOM */}
+            <input
+              type="range"
+              min={1}
+              max={3}
+              step={0.1}
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+              className="w-full mt-4"
             />
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-        )}
-      </button>
+
+            {/* ACTIONS */}
+            <div className="mt-4 flex justify-between">
+              <button
+                type="button"
+                onClick={() => setImageSrc(null)}
+                className="text-white"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleUpload}
+                className="bg-pink-500 text-white px-4 py-2 rounded-lg"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

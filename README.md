@@ -47,26 +47,26 @@ In this in-depth tutorial you'll build a production-ready **FullStack Dating Web
 
 ## ⚙️ Tech Stack
 
-* **Next.js (App Router)** – Server & client components for fast SSR/SSG
-* **Supabase** – Postgres database, auth, RLS, storage & realtime
-* [**Stream** – Real-time chat & video/call SDK](https://getstream.io/chat/sdk/react/?utm_source=youtube&utm_medium=referral&utm_content=&utm_campaign=pedro2025)
-* **TailwindCSS** – Utility-first styling & responsive layouts
-* **TypeScript** – Type-safe codebase
-* **Vercel** – Recommended hosting & serverless deployment
+- **Next.js (App Router)** – Server & client components for fast SSR/SSG
+- **Supabase** – Postgres database, auth, RLS, storage & realtime
+- [**Stream** – Real-time chat & video/call SDK](https://getstream.io/chat/sdk/react/?utm_source=youtube&utm_medium=referral&utm_content=&utm_campaign=pedro2025)
+- **TailwindCSS** – Utility-first styling & responsive layouts
+- **TypeScript** – Type-safe codebase
+- **Vercel** – Recommended hosting & serverless deployment
 
 ---
 
 ## ⚡️ Features
 
-* 🔒 **Auth** — Secure sign-up, sign-in, and session handling
-* 🧾 **Postgres Schema** — Profiles, matches, messages, calls (RLS-ready)
-* 👤 **Profile Page** — View & edit user profile with photos & bio
-* 🧪 **Fake Profiles Seeder** — Seed the database for local testing
-* ❤️ **Matching System** — Discover, like & match users
-* 💬 **Realtime Chat** — One-to-one messaging via Stream
-* 🎥 **Live Video Calls** — WebRTC-backed calls using Stream SDK
-* 📱 **Responsive UI** — Mobile-first design with Tailwind
-* ✅ **Production-ready** — Env config, deployment guide, and seeding scripts
+- 🔒 **Auth** — Secure sign-up, sign-in, and session handling
+- 🧾 **Postgres Schema** — Profiles, matches, messages, calls (RLS-ready)
+- 👤 **Profile Page** — View & edit user profile with photos & bio
+- 🧪 **Fake Profiles Seeder** — Seed the database for local testing
+- ❤️ **Matching System** — Discover, like & match users
+- 💬 **Realtime Chat** — One-to-one messaging via Stream
+- 🎥 **Live Video Calls** — WebRTC-backed calls using Stream SDK
+- 📱 **Responsive UI** — Mobile-first design with Tailwind
+- ✅ **Production-ready** — Env config, deployment guide, and seeding scripts
 
 ---
 
@@ -74,16 +74,16 @@ In this in-depth tutorial you'll build a production-ready **FullStack Dating Web
 
 ### Prerequisites
 
-* [Node.js (v18+)](https://nodejs.org/)
-* [Supabase account](https://app.supabase.com/)
-* [Stream account](https://getstream.io/chat/sdk/react/?utm_source=youtube&utm_medium=referral&utm_content=&utm_campaign=pedro2025)
-* [Vercel account](https://vercel.com/) for deployment
+- [Node.js (v18+)](https://nodejs.org/)
+- [Supabase account](https://app.supabase.com/)
+- [Stream account](https://getstream.io/chat/sdk/react/?utm_source=youtube&utm_medium=referral&utm_content=&utm_campaign=pedro2025)
+- [Vercel account](https://vercel.com/) for deployment
 
 ### Supabase SQL Command:
 
 ```sql
 -- =====================================================
--- StreamMatch Dating App - Complete Database Schema
+-- popcircle Dating App - Complete Database Schema
 -- =====================================================
 
 -- Enable necessary extensions
@@ -179,8 +179,8 @@ RETURNS TRIGGER AS $$
 BEGIN
     -- Check if the other user has also liked this user
     IF EXISTS (
-        SELECT 1 FROM public.likes 
-        WHERE from_user_id = NEW.to_user_id 
+        SELECT 1 FROM public.likes
+        WHERE from_user_id = NEW.to_user_id
         AND to_user_id = NEW.from_user_id
     ) THEN
         -- Create a match (avoid duplicates)
@@ -191,7 +191,7 @@ BEGIN
         )
         ON CONFLICT (user1_id, user2_id) DO NOTHING;
     END IF;
-    
+
     RETURN NEW;
 END;
 $$ language 'plpgsql' SECURITY DEFINER;
@@ -238,7 +238,7 @@ BEGIN
         NULL,
         '{"age_range": {"min": 18, "max": 50}, "distance": 25, "gender_preference": []}'::jsonb
     );
-    
+
     RETURN NEW;
 END;
 $$ language 'plpgsql' SECURITY DEFINER;
@@ -300,7 +300,7 @@ Copy the example env and fill your keys:
 cp .env.example .env.local
 # then edit .env.local with:
 # NEXT_PUBLIC_SUPABASE_URL=
-# NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY=
 # SUPABASE_SERVICE_ROLE_KEY=
 # STREAM_API_KEY=
 # STREAM_API_SECRET=
@@ -328,6 +328,7 @@ npm run dev
 ---
 
 ## 🖼️ Screenshots
+
 <img width="998" height="850" alt="Screenshot 2025-08-18 at 4 52 24 PM" src="https://github.com/user-attachments/assets/a9a05363-26b6-4b66-9de8-b476ed0d39a1" />
 <img width="958" height="840" alt="Screenshot 2025-08-18 at 4 56 45 PM" src="https://github.com/user-attachments/assets/36e4b4f8-deb5-46db-952d-ecf59b172647" />
 <img width="1811" height="924" alt="Screenshot 2025-08-14 at 7 20 03 PM" src="https://github.com/user-attachments/assets/490ec5c9-7553-4d89-ab39-9b6a892d77de" />
@@ -351,17 +352,17 @@ Your live app will be hosted on a Vercel subdomain (e.g. `https://your-dating-ap
 
 ## 🔗 Useful Links
 
-* [Next.js Documentation](https://nextjs.org/docs)
-* [Supabase Docs (Auth, Database, Realtime)](https://supabase.com/docs)
-* [Stream Chat & Video SDK](https://getstream.io/chat/sdk/react/)
-* [Tailwind CSS Docs](https://tailwindcss.com/docs)
-* [Vercel](https://vercel.com/)
-* Example / reference code used in video: [machadop1407/social-media-vite-supabase](https://github.com/machadop1407/social-media-vite-supabase)
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Supabase Docs (Auth, Database, Realtime)](https://supabase.com/docs)
+- [Stream Chat & Video SDK](https://getstream.io/chat/sdk/react/)
+- [Tailwind CSS Docs](https://tailwindcss.com/docs)
+- [Vercel](https://vercel.com/)
+- Example / reference code used in video: [machadop1407/social-media-vite-supabase](https://github.com/machadop1407/social-media-vite-supabase)
 
 ---
 
 If you’d like, I can:
 
-* add the SQL schema file (`supabase/schema.sql`) and a ready-to-run seeder script,
-* produce an `.env.example` with the exact keys used in the tutorial,
-* or generate a complete GitHub repo structure (folders, starter files) you can copy into a new repo. Which one would you like next?
+- add the SQL schema file (`supabase/schema.sql`) and a ready-to-run seeder script,
+- produce an `.env.example` with the exact keys used in the tutorial,
+- or generate a complete GitHub repo structure (folders, starter files) you can copy into a new repo. Which one would you like next?

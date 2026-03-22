@@ -3,48 +3,89 @@
 import { UserProfile } from "@/app/profile/page";
 import { createClient } from "../supabase/server";
 
+// 🔥 ALL USERS (FOR HOME BUBBLES)
+export async function getAllUsers(): Promise<UserProfile[]> {
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase.from("users").select("*").limit(50);
+
+    if (error) {
+      console.error("getAllUsers error:", error);
+      return [];
+    }
+
+    return (
+      data?.map((user) => ({
+        id: user.id,
+        full_name: user.full_name,
+        username: user.username,
+        email: "",
+        gender: user.gender,
+        birthdate: user.birthdate,
+        bio: user.bio,
+        avatar_url: user.avatar_url,
+        preferences: user.preferences,
+        location_lat: undefined,
+        location_lng: undefined,
+        last_active: new Date().toISOString(),
+        is_verified: true,
+        is_online: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })) || []
+    );
+  } catch (err) {
+    console.error("getAllUsers failed:", err);
+    return [];
+  }
+}
+
+// ✅ FILTERED USER DISCOVERY (FOR SWIPING)
 export async function getPotentialMatches(): Promise<UserProfile[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
 
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const { data: potentialMatches, error } = await supabase
-    .from("users")
-    .select("*")
-    .neq("id", user.id)
-    .limit(50);
+    if (!user) return [];
 
-  if (error) {
-    throw new Error("failed to fetch potential matches");
-  }
+    const { data: sentLikes } = await supabase
+      .from("likes")
+      .select("to_user_id")
+      .eq("from_user_id", user.id);
 
-  const { data: userPrefs, error: prefsError } = await supabase
-    .from("users")
-    .select("preferences")
-    .eq("id", user.id)
-    .single();
+    const { data: matches } = await supabase
+      .from("matches")
+      .select("user1_id, user2_id")
+      .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+      .eq("is_active", true);
 
-  if (prefsError) {
-    throw new Error("Failed to get user preferences");
-  }
+    const likedIds = sentLikes?.map((l) => l.to_user_id) || [];
 
-  const currentUserPrefs = userPrefs.preferences as any;
-  const genderPreference = currentUserPrefs?.gender_preference || [];
-  const filteredMatches =
-    potentialMatches
-      .filter((match) => {
-        if (!genderPreference || genderPreference.length === 0) {
-          return true;
-        }
+    const matchedIds =
+      matches?.map((m) => (m.user1_id === user.id ? m.user2_id : m.user1_id)) ||
+      [];
 
-        return genderPreference.includes(match.gender);
-      })
-      .map((match) => ({
+    const excludeIds = [...new Set([...likedIds, ...matchedIds, user.id])];
+
+    let query = supabase.from("users").select("*");
+
+    if (excludeIds.length > 0) {
+      query = query.not("id", "in", `(${excludeIds.join(",")})`);
+    }
+
+    const { data, error } = await query.limit(50);
+
+    if (error) {
+      console.error("getPotentialMatches error:", error);
+      return [];
+    }
+
+    return (
+      data?.map((match) => ({
         id: match.id,
         full_name: match.full_name,
         username: match.username,
@@ -61,98 +102,94 @@ export async function getPotentialMatches(): Promise<UserProfile[]> {
         is_online: false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      })) || [];
-  return filteredMatches;
+      })) || []
+    );
+  } catch (err) {
+    console.error("getPotentialMatches failed:", err);
+    return [];
+  }
 }
 
+// ✅ LIKE USER
 export async function likeUser(toUserId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
 
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const { error: likeError } = await supabase.from("likes").insert({
-    from_user_id: user.id,
-    to_user_id: toUserId,
-  });
+    if (!user) return { success: false };
 
-  if (likeError) {
-    throw new Error("Failed to create like");
-  }
+    const { error: likeError } = await supabase.from("likes").insert({
+      from_user_id: user.id,
+      to_user_id: toUserId,
+    });
 
-  const { data: existingLike, error: checkError } = await supabase
-    .from("likes")
-    .select("*")
-    .eq("from_user_id", toUserId)
-    .eq("to_user_id", user.id)
-    .single();
-
-  if (checkError && checkError.code !== "PGRST116") {
-    throw new Error("Failed to check for match");
-  }
-
-  if (existingLike) {
-    const { data: matchedUser, error: userError } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", toUserId)
-      .single();
-
-    if (userError) {
-      throw new Error("Failed to fetch matched user");
+    if (likeError) {
+      console.error("likeUser insert error:", likeError);
+      return { success: false };
     }
 
-    return {
-      success: true,
-      isMatch: true,
-      matchedUser: matchedUser as UserProfile,
-    };
-  }
+    const { data: existingLike } = await supabase
+      .from("likes")
+      .select("id")
+      .eq("from_user_id", toUserId)
+      .eq("to_user_id", user.id)
+      .maybeSingle();
 
-  return { success: true, isMatch: false };
+    if (existingLike) {
+      const { data: matchedUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", toUserId)
+        .single();
+
+      return {
+        success: true,
+        isMatch: true,
+        matchedUser: matchedUser as UserProfile,
+      };
+    }
+
+    return { success: true, isMatch: false };
+  } catch (err) {
+    console.error("likeUser failed:", err);
+    return { success: false };
+  }
 }
 
-export async function getUserMatches() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+// ✅ GET MATCHES
+export async function getUserMatches(): Promise<UserProfile[]> {
+  try {
+    const supabase = await createClient();
 
-  if (!user) {
-    throw new Error("Not authenticated.");
-  }
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
-  const { data: matches, error } = await supabase
-    .from("matches")
-    .select("*")
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
-    .eq("is_active", true);
+    if (!user) return [];
 
-  if (error) {
-    throw new Error("Failed to fetch matches");
-  }
+    const { data: matches } = await supabase
+      .from("matches")
+      .select("*")
+      .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
+      .eq("is_active", true);
 
-  const matchedUsers: UserProfile[] = [];
+    if (!matches || matches.length === 0) return [];
 
-  for (const match of matches || []) {
-    const otherUserId =
-      match.user1_id === user.id ? match.user2_id : match.user1_id;
+    const otherUserIds = matches.map((match) =>
+      match.user1_id === user.id ? match.user2_id : match.user1_id,
+    );
 
-    const { data: otherUser, error: userError } = await supabase
+    const { data: users } = await supabase
       .from("users")
       .select("*")
-      .eq("id", otherUserId)
-      .single();
+      .in("id", otherUserIds);
 
-    if (userError) {
-      continue;
-    }
+    if (!users) return [];
 
-    matchedUsers.push({
+    return users.map((otherUser, index) => ({
       id: otherUser.id,
       full_name: otherUser.full_name,
       username: otherUser.username,
@@ -167,10 +204,67 @@ export async function getUserMatches() {
       last_active: new Date().toISOString(),
       is_verified: true,
       is_online: false,
-      created_at: match.created_at,
-      updated_at: match.created_at,
-    });
+      created_at: matches[index]?.created_at,
+      updated_at: matches[index]?.created_at,
+    }));
+  } catch (err) {
+    console.error("getUserMatches failed:", err);
+    return [];
   }
+}
 
-  return matchedUsers;
+// 🔥 INCOMING LIKES (FIXED)
+export async function getIncomingLikes(): Promise<UserProfile[]> {
+  try {
+    const supabase = await createClient();
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return [];
+
+    const { data: likes } = await supabase
+      .from("likes")
+      .select("from_user_id, created_at")
+      .eq("to_user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (!likes || likes.length === 0) return [];
+
+    const userIds = likes.map((l) => l.from_user_id);
+
+    const { data: users } = await supabase
+      .from("users")
+      .select("*")
+      .in("id", userIds);
+
+    if (!users) return [];
+
+    return users.map((liker) => {
+      const like = likes.find((l) => l.from_user_id === liker.id);
+
+      return {
+        id: liker.id,
+        full_name: liker.full_name,
+        username: liker.username,
+        email: liker.email,
+        gender: liker.gender,
+        birthdate: liker.birthdate,
+        bio: liker.bio,
+        avatar_url: liker.avatar_url,
+        preferences: liker.preferences,
+        location_lat: undefined,
+        location_lng: undefined,
+        last_active: new Date().toISOString(),
+        is_verified: true,
+        is_online: false,
+        created_at: like?.created_at,
+        updated_at: like?.created_at,
+      };
+    });
+  } catch (err) {
+    console.error("getIncomingLikes failed:", err);
+    return [];
+  }
 }

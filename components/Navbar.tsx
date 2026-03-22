@@ -1,77 +1,173 @@
 "use client";
+
 import { useAuth } from "@/contexts/auth-context";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
+import { getIncomingLikes } from "@/lib/actions/matches";
+import Logo from "./Logo";
 
 export default function Navbar() {
-  const { signOut, user } = useAuth();
+  const { signOut, user, loading } = useAuth();
+
+  const [newLikesCount, setNewLikesCount] = useState(0);
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  if (loading) return null;
+
+  // ✅ ONLY LOAD ONCE (NO POLLING → fixes ngrok spam)
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadLikes() {
+      try {
+        const likes = await getIncomingLikes();
+
+        if (!likes || likes.length === 0) {
+          setNewLikesCount(0);
+          return;
+        }
+
+        const lastSeen = localStorage.getItem("lastSeenLike");
+
+        // first time baseline
+        if (!lastSeen) {
+          localStorage.setItem("lastSeenLike", likes[0].created_at);
+          setNewLikesCount(0);
+          return;
+        }
+
+        const newLikes = likes.filter(
+          (l) => new Date(l.created_at) > new Date(lastSeen),
+        );
+
+        setNewLikesCount(newLikes.length);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    loadLikes();
+  }, [user]);
+
+  // 🔥 CLOSE MENU
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    if (open) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  // 🔥 CLEAR NOTIFICATIONS
+  function handleMessagesClick() {
+    const now = new Date().toISOString();
+    localStorage.setItem("lastSeenLike", now);
+    setNewLikesCount(0);
+  }
+
   return (
-    <nav className="relative z-50 bg-slate-900 border-b border-gray-200/50 dark:border-gray-700/50">
-      <div className="container mx-auto px-6">
+    <nav className="relative z-50 backdrop-blur-md border-b border-white/10">
+      <div className="w-full px-3 sm:px-4">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center space-x-3">
-            <span className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-              StreamMatch
-            </span>
-          </Link>
+          <Logo />
 
-          {/* Only show navigation links if user is authenticated */}
-          {user && (
-            <div className="hidden md:flex items-center space-x-8">
-              <Link
-                href="/matches"
-                className="text-gray-700 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 font-medium transition-colors duration-200"
-              >
-                Discover
-              </Link>
-              <Link
-                href="/matches/list"
-                className="text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-colors duration-200"
-              >
-                Matches
-              </Link>
-              <Link
-                href="/chat"
-                className="text-gray-700 dark:text-gray-300 hover:text-green-600 dark:hover:text-green-400 font-medium transition-colors duration-200"
-              >
-                Messages
-              </Link>
-              <Link
-                href="/profile"
-                className="text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 font-medium transition-colors duration-200"
-              >
-                Profile
-              </Link>
-            </div>
-          )}
+          <div className="flex items-center gap-4 mr-1">
+            {user && (
+              <>
+                <Link
+                  href="/chat"
+                  onClick={handleMessagesClick}
+                  className={`relative transition ${
+                    newLikesCount > 0
+                      ? "text-red-500"
+                      : "text-white/80 hover:text-white"
+                  }`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="22"
+                    height="22"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                  </svg>
 
-          {user ? (
-            <button
-              onClick={signOut}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 text-white text-sm font-medium rounded-lg hover:from-red-600 hover:to-red-700 transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              <svg
-                className="w-4 h-4 mr-1"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+                  {newLikesCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] px-1.5 py-[1px] rounded-full animate-pulse shadow">
+                      {newLikesCount}
+                    </span>
+                  )}
+                </Link>
+
+                <button
+                  onClick={() => setOpen((prev) => !prev)}
+                  className="text-white/80 hover:text-white transition"
+                >
+                  <svg width="26" height="26" fill="none" stroke="currentColor">
+                    <path d="M4 7h18M4 13h18M4 19h18" strokeWidth="2" />
+                  </svg>
+                </button>
+
+                {open && (
+                  <div
+                    ref={menuRef}
+                    className="absolute right-6 top-16 w-52 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden text-white"
+                  >
+                    <Link
+                      href="/matches"
+                      onClick={() => setOpen(false)}
+                      className="block px-4 py-3 hover:bg-zinc-800 transition"
+                    >
+                      Discover
+                    </Link>
+
+                    <Link
+                      href="/matches/list"
+                      onClick={() => setOpen(false)}
+                      className="block px-4 py-3 hover:bg-zinc-800 transition"
+                    >
+                      Matches
+                    </Link>
+
+                    <Link
+                      href="/profile"
+                      onClick={() => setOpen(false)}
+                      className="block px-4 py-3 hover:bg-zinc-800 transition"
+                    >
+                      Profile
+                    </Link>
+
+                    <div className="border-t border-white/10" />
+
+                    <button
+                      onClick={() => {
+                        signOut();
+                        setOpen(false);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-zinc-800 text-red-500"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {!user && (
+              <Link
+                href="/auth"
+                className="px-4 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-red-500 text-white shadow"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              Sign Out
-            </button>
-          ) : (
-            <Link
-              href="/auth"
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-pink-500 to-red-500 text-white text-sm font-medium rounded-lg hover:from-pink-600 hover:to-red-600 transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              Sign In
-            </Link>
-          )}
+                Sign In
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>

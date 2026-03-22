@@ -12,7 +12,23 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "imljzgcuelzzzncfzlnc.supabase.co",
       },
+      {
+        protocol: "https",
+        hostname: "i.pravatar.cc", // ✅ ADD THIS
+      },
     ],
+  },
+
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
+  },
+};
+
+module.exports = {
+  images: {
+    domains: ["res.cloudinary.com", "xfdclkiezvhpqfjjdehz.supabase.co"],
   },
 };
 

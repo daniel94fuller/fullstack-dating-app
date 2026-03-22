@@ -1,0 +1,3 @@
+[auth]
+enable_signup = true
+enable_confirmations = false

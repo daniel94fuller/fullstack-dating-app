@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-export async function updateSession(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -15,64 +15,53 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            request.cookies.set(name, value)
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value),
           );
+
           supabaseResponse = NextResponse.next({
             request,
           });
+
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
-
+  // ✅ Get current user
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
-  // Public routes that don't require authentication
-  const publicRoutes = ["/", "/auth"];
+  // 🔒 Protected routes ONLY
+  const protectedRoutes = ["/matches", "/chat"];
 
-  // Protected routes that require authentication
-  const protectedRoutes = ["/matches", "/chat", "/profile"];
-
-  // Check if the current path is protected
   const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
+    pathname.startsWith(route),
   );
 
-  // Check if the current path is public
-  const isPublicRoute = publicRoutes.some(
-    (route) => pathname === route || pathname.startsWith(route)
-  );
-
-  // If user is not authenticated and trying to access protected routes
+  // 🚨 Not logged in → trying to access protected route
   if (!user && isProtectedRoute) {
-    const redirectUrl = new URL("/auth", request.url);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL("/auth", request.url));
   }
 
-  // If user is authenticated and trying to access auth page, redirect to home
-  if (user && pathname === "/auth") {
-    const redirectUrl = new URL("/", request.url);
-    return NextResponse.redirect(redirectUrl);
+  // 🔁 Logged in → trying to access auth page
+  if (user && pathname.startsWith("/auth")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
 
-  // If user is authenticated and trying to access protected routes, allow access
-  if (user && isProtectedRoute) {
-    return supabaseResponse;
-  }
-
+  // ✅ Everything else is public
   return supabaseResponse;
 }
+
+// ✅ Ensure middleware runs on all routes (except static files)
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};
