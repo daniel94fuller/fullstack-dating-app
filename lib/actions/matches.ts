@@ -1,7 +1,5 @@
-"use server";
-
 import { UserProfile } from "@/app/profile/page";
-import { createClient } from "../supabase/server";
+import { createClient } from "../supabase/client";
 
 // 🔥 ALL USERS (FOR HOME BUBBLES)
 export async function getAllUsers(): Promise<UserProfile[]> {
@@ -213,7 +211,7 @@ export async function getUserMatches(): Promise<UserProfile[]> {
   }
 }
 
-// 🔥 INCOMING LIKES (FIXED)
+// 🔥 INCOMING LIKES
 export async function getIncomingLikes(): Promise<UserProfile[]> {
   try {
     const supabase = await createClient();

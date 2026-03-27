@@ -13,9 +13,7 @@ export default function Navbar() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  if (loading) return null;
-
-  // ✅ ONLY LOAD ONCE (NO POLLING → fixes ngrok spam)
+  // ✅ LOAD LIKES
   useEffect(() => {
     if (!user) return;
 
@@ -30,7 +28,6 @@ export default function Navbar() {
 
         const lastSeen = localStorage.getItem("lastSeenLike");
 
-        // first time baseline
         if (!lastSeen) {
           localStorage.setItem("lastSeenLike", likes[0].created_at);
           setNewLikesCount(0);
@@ -50,7 +47,7 @@ export default function Navbar() {
     loadLikes();
   }, [user]);
 
-  // 🔥 CLOSE MENU
+  // 🔥 CLOSE MENU ON OUTSIDE CLICK
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
@@ -62,6 +59,9 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [open]);
 
+  // ✅ AFTER hooks → safe
+  if (loading) return null;
+
   // 🔥 CLEAR NOTIFICATIONS
   function handleMessagesClick() {
     const now = new Date().toISOString();
@@ -71,6 +71,7 @@ export default function Navbar() {
 
   return (
     <nav className="relative z-50 backdrop-blur-md border-b border-white/10">
+      {/* 🔥 tighter edges */}
       <div className="w-full px-3 sm:px-4">
         <div className="flex items-center justify-between h-16">
           <Logo />
@@ -78,6 +79,7 @@ export default function Navbar() {
           <div className="flex items-center gap-4 mr-1">
             {user && (
               <>
+                {/* CHAT / NOTIFICATIONS */}
                 <Link
                   href="/chat"
                   onClick={handleMessagesClick}
@@ -105,6 +107,7 @@ export default function Navbar() {
                   )}
                 </Link>
 
+                {/* BURGER MENU */}
                 <button
                   onClick={() => setOpen((prev) => !prev)}
                   className="text-white/80 hover:text-white transition"
@@ -114,11 +117,21 @@ export default function Navbar() {
                   </svg>
                 </button>
 
+                {/* DROPDOWN */}
                 {open && (
                   <div
                     ref={menuRef}
-                    className="absolute right-6 top-16 w-52 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden text-white"
+                    className="absolute right-4 top-16 w-52 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl overflow-hidden text-white"
                   >
+                    {/* ROOMS */}
+                    <Link
+                      href="/rooms"
+                      onClick={() => setOpen(false)}
+                      className="block px-4 py-3 hover:bg-zinc-800 transition"
+                    >
+                      🎥 Rooms
+                    </Link>
+
                     <Link
                       href="/matches"
                       onClick={() => setOpen(false)}

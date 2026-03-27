@@ -27,7 +27,7 @@ export default function ProfileClient({ user, matchCount, feed }: any) {
 
             {user.username && (
               <a
-                href={`https://instagram.com/${user.username}`}
+                href={`https://instagram.com/${user.instagram}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-pink-500 hover:scale-110 transition"

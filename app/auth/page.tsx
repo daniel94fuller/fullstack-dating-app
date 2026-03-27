@@ -7,32 +7,53 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function AuthPage() {
-  const [isSignUp, setIsSignUp] = useState<boolean>(false);
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   const supabase = createClient();
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // ✅ Redirect if already logged in
+  // 🔥 SMART REDIRECT (based on profile completeness)
   useEffect(() => {
-    if (user && !authLoading) {
-      router.push("/");
+    async function checkProfile() {
+      if (!user || authLoading) return;
+
+      const { data } = await supabase
+        .from("users")
+        .select("full_name, avatar_url, birthdate, instagram")
+        .eq("id", user.id)
+        .single();
+
+      const isComplete =
+        data?.full_name &&
+        data?.avatar_url &&
+        data?.birthdate &&
+        data?.instagram;
+
+      if (!isComplete) {
+        router.push("/complete-profile");
+      } else {
+        router.push("/");
+      }
     }
-  }, [user, authLoading, router]);
+
+    checkProfile();
+  }, [user, authLoading, router, supabase]);
 
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
+
+    if (loading) return;
 
     setLoading(true);
     setError("");
 
     try {
       if (isSignUp) {
-        // 🔥 SIGN UP
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -41,18 +62,9 @@ export default function AuthPage() {
         if (error) throw error;
 
         if (data.user) {
-          await upsertUser(data.user);
-        }
-
-        // ✅ If email confirm OFF → session exists
-        if (data.session) {
-          router.push("/");
-          router.refresh();
-        } else {
-          setError("Check your email to confirm your account");
+          await ensureUserExists(data.user);
         }
       } else {
-        // 🔥 SIGN IN
         const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -61,12 +73,11 @@ export default function AuthPage() {
         if (error) throw error;
 
         if (data.user) {
-          await upsertUser(data.user);
+          await ensureUserExists(data.user);
         }
-
-        router.push("/");
-        router.refresh();
       }
+
+      // ❌ No redirect here — handled by useEffect
     } catch (err: any) {
       console.log("AUTH ERROR:", err);
       setError(err.message || "Something went wrong");
@@ -75,39 +86,48 @@ export default function AuthPage() {
     }
   }
 
-  // 🔥 SAFE UPSERT FUNCTION (fixes your 400 error)
-  async function upsertUser(user: any) {
-    const username = user.email?.split("@")[0] || `user_${user.id.slice(0, 6)}`;
+  // 🔥 CREATE USER ONLY IF NOT EXISTS
+  async function ensureUserExists(user: any) {
+    const { data: existing } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", user.id)
+      .single();
 
-    const { error } = await supabase.from("users").upsert(
-      {
-        id: user.id,
-        email: user.email,
-        username,
-        full_name: "",
-        avatar_url: "",
-      },
-      { onConflict: "id" },
-    );
+    if (existing) return;
+
+    const username =
+      user.email?.split("@")[0] || `user_${user.id?.slice(0, 6)}` || "user";
+
+    const { error } = await supabase.from("users").insert({
+      id: user.id,
+      email: user.email ?? "",
+      username,
+      full_name: "",
+      avatar_url: "",
+      instagram: "",
+      gender: "other",
+      birthdate: null, // 🔥 force onboarding
+      location: "San Francisco",
+    });
 
     if (error) {
-      console.error("USER UPSERT ERROR:", error);
+      console.error("USER CREATE ERROR:", error.message || error);
     }
   }
+
+  if (authLoading) return null;
 
   return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="max-w-md w-full space-y-8 p-8">
-        {/* HEADER */}
         <div className="text-center">
           <Logo />
-
           <p className="opacity-70">
             {isSignUp ? "Create Your Account" : "Sign in to your account"}
           </p>
         </div>
 
-        {/* FORM */}
         <form className="space-y-6" onSubmit={handleAuth}>
           <div>
             <label className="block text-sm mb-1">Email</label>
@@ -117,7 +137,6 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="input"
-              placeholder="Enter your email"
             />
           </div>
 
@@ -129,7 +148,6 @@ export default function AuthPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="input"
-              placeholder="Enter your password"
             />
           </div>
 
@@ -144,11 +162,10 @@ export default function AuthPage() {
           </button>
         </form>
 
-        {/* TOGGLE */}
         <div className="text-center">
           <button
             onClick={() => setIsSignUp(!isSignUp)}
-            className="text-pink-500 hover:opacity-80 text-sm"
+            className="text-pink-500 text-sm"
           >
             {isSignUp
               ? "Already have an account? Sign in"

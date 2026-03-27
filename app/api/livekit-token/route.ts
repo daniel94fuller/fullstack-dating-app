@@ -11,6 +11,7 @@ export async function GET(req: Request) {
     return new NextResponse("Missing params", { status: 400 });
   }
 
+  // 🔥 CREATE TOKEN (NO SUPABASE)
   const at = new AccessToken(
     process.env.LIVEKIT_API_KEY!,
     process.env.LIVEKIT_API_SECRET!,

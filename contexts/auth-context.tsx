@@ -1,4 +1,5 @@
 "use client";
+
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
@@ -13,40 +14,57 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
   const supabase = createClient();
   const router = useRouter();
 
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<boolean>(true); // ✅ start true
+
   useEffect(() => {
-    async function checkUser() {
+    let mounted = true;
+
+    async function initAuth() {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
 
-        setUser(session?.user ?? null);
-        console.log(session?.user);
-        const {
-          data: { subscription },
-        } = supabase.auth.onAuthStateChange(async (event, session) => {
-          setUser(session?.user ?? null);
-        });
+        // 🔥 HANDLE BROKEN REFRESH TOKEN
+        if (error) {
+          console.warn("Session error:", error.message);
 
-        return () => subscription.unsubscribe();
-      } catch (error) {
-        console.error(error);
+          if (error.message.includes("Refresh Token")) {
+            await supabase.auth.signOut(); // clean bad state
+          }
+        }
+
+        if (!mounted) return;
+
+        setUser(data.session?.user ?? null);
+      } catch (err) {
+        console.error("Auth init error:", err);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     }
 
-    checkUser();
-  }, []);
+    initAuth();
+
+    // 🔥 CORRECT listener setup
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe(); // ✅ properly cleaned
+    };
+  }, [supabase]);
 
   async function signOut() {
     try {
       await supabase.auth.signOut();
+      setUser(null);
       router.push("/auth");
     } catch (error) {
       console.error("Error signing out:", error);
@@ -62,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;

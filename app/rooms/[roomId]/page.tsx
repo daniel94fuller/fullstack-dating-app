@@ -3,49 +3,56 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import VideoRoom from "@/components/VideoRoom";
+import { createClient } from "@/lib/supabase/client";
+import { use } from "react";
 
-export default function RoomPage({ params }: any) {
+export default function RoomPage(props: any) {
+  const params = use(props.params);
+
   const { user } = useAuth();
-  const [token, setToken] = useState("");
-  const [joined, setJoined] = useState(false);
+  const supabase = createClient();
 
-  async function joinRoom() {
+  const [token, setToken] = useState("");
+
+  useEffect(() => {
     if (!user) return;
 
-    const res = await fetch(
-      `/api/livekit-token?room=${params.roomId}&username=${user.id}`,
-    );
+    async function joinRoom() {
+      try {
+        const res = await fetch(
+          `/api/livekit-token?room=${params.roomId}&username=${user.id}`,
+        );
 
-    const data = await res.json();
-    setToken(data.token);
-    setJoined(true);
-  }
+        const data = await res.json();
+        setToken(data.token);
+
+        await supabase
+          .from("rooms")
+          .update({ last_active: new Date().toISOString() })
+          .eq("id", params.roomId);
+      } catch (err) {
+        console.error("JOIN ROOM ERROR:", err);
+      }
+    }
+
+    joinRoom();
+  }, [user, params.roomId]);
 
   if (!user) {
-    return <div className="text-white p-6">Sign in to join</div>;
+    return <div className="text-white p-6">Sign in to join this room</div>;
+  }
+
+  if (!token) {
+    return (
+      <div className="h-[calc(100vh-60px)] flex items-center justify-center text-white">
+        Connecting to room...
+      </div>
+    );
   }
 
   return (
-    <div className="h-[calc(100vh-60px)] text-white">
-      {!joined ? (
-        <div className="flex flex-col items-center justify-center h-full gap-4">
-          <h2 className="text-xl font-semibold">Room: {params.roomId}</h2>
-
-          <button
-            onClick={joinRoom}
-            className="
-              px-6 py-3 rounded-xl
-              bg-gradient-to-r from-green-500 to-emerald-500
-              font-semibold
-              hover:scale-105 transition
-            "
-          >
-            Join Room
-          </button>
-        </div>
-      ) : (
-        <VideoRoom token={token} />
-      )}
+    <div className="h-[calc(100vh-60px)]">
+      <VideoRoom token={token} />
     </div>
   );
 }

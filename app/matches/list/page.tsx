@@ -1,128 +1,134 @@
 "use client";
 
-import { UserProfile } from "@/app/profile/page";
-import { getUserMatches } from "@/lib/actions/matches";
+import { useAuth } from "@/contexts/auth-context";
 import { useEffect, useState } from "react";
+import { getAllUsers } from "@/lib/actions/matches";
+import { UserProfile } from "@/app/profile/page";
+import UserAvatarBubble from "@/components/UserAvatarBubble";
 import Link from "next/link";
-import { calculateAge } from "@/lib/helpers/calculate-age";
+import { getGlobalActivity } from "@/lib/actions/activity";
+import ActivityCard from "@/components/ActivityCard";
 import UserAvatarSquare from "@/components/UserAvatarSquare";
+import { calculateAge } from "@/lib/helpers/calculate-age";
 
-export default function MatchesListPage() {
-  const [matches, setMatches] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function Home() {
+  const { loading } = useAuth();
 
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [activity, setActivity] = useState<any[]>([]);
+
+  // 🔥 Load users
   useEffect(() => {
-    async function loadMatches() {
+    async function loadUsers() {
       try {
-        const userMatches = await getUserMatches();
-        setMatches(userMatches);
-      } catch (error) {
-        setError("Failed to load matches.");
-      } finally {
-        setLoading(false);
+        const data = await getAllUsers();
+        setUsers(data);
+      } catch (err) {
+        console.error(err);
       }
     }
 
-    loadMatches();
+    loadUsers();
+  }, []);
+
+  // 🔥 Load activity
+  useEffect(() => {
+    async function loadActivity() {
+      const data = await getGlobalActivity();
+      setActivity(data);
+    }
+
+    loadActivity();
   }, []);
 
   // 🔄 LOADING
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto"></div>
-          <p className="mt-4 text-zinc-400">Loading your matches...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ❌ ERROR
-  if (error) {
-    return (
-      <div className="min-h-screen bg-zinc-900 flex items-center justify-center text-zinc-400">
-        {error}
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
-      <div className="container mx-auto px-4 py-8">
-        {/* HEADER */}
-        <header className="text-center mb-8">
-          <h1 className="text-3xl font-bold mb-2">Your Matches</h1>
-          <p className="text-zinc-400">
-            {matches.length} match{matches.length !== 1 ? "es" : ""}
-          </p>
-        </header>
-
-        {/* EMPTY STATE */}
-        {matches.length === 0 ? (
-          <div className="text-center max-w-md mx-auto p-8">
-            <div className="w-24 h-24 bg-gradient-to-r from-pink-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">💕</span>
-            </div>
-
-            <h2 className="text-2xl font-bold mb-4">No matches yet</h2>
-
-            <p className="text-zinc-400 mb-6">
-              Start swiping to find your perfect match!
-            </p>
-
+    <div className="w-full">
+      {/* 🔥 USER BUBBLES (UNCHANGED) */}
+      <div className="overflow-x-auto scrollbar-hide">
+        <div className="flex gap-4 px-4 py-3 min-w-max">
+          {users.map((u) => (
             <Link
-              href="/matches"
-              className="bg-gradient-to-r from-pink-500 to-red-500 text-white font-semibold py-3 px-6 rounded-full hover:opacity-90 transition"
+              key={u.id}
+              href={`/profile/${u.username}`}
+              className="flex flex-col items-center min-w-[70px] cursor-pointer active:scale-95 transition"
             >
-              Start Swiping
+              <UserAvatarBubble
+                src={u.avatar_url}
+                username={u.username}
+                size={80}
+              />
+
+              <p className="text-xs mt-1 text-center truncate w-full">
+                {u.full_name}
+              </p>
             </Link>
-          </div>
-        ) : (
-          <div className="max-w-2xl mx-auto">
-            <div className="grid gap-4">
-              {matches.map((match, key) => (
-                <Link
-                  key={key}
-                  href={`/chat/${match.id}`}
-                  className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4 shadow hover:bg-zinc-700 transition"
-                >
-                  <div className="flex items-center space-x-4">
-                    {/* AVATAR */}
-                    <div className="w-16 h-16 flex-shrink-0">
-                      <UserAvatarSquare
-                        src={match.avatar_url}
-                        username={match.username}
-                        className="!rounded-full"
-                      />
-                    </div>
+          ))}
+        </div>
+      </div>
 
-                    {/* INFO */}
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg font-semibold">
-                        {match.full_name}, {calculateAge(match.birthdate)}
-                      </h3>
+      {/* 🔥 ACTIVITY (LIMIT 3) */}
+      <div className="px-4 mt-4 space-y-3">
+        <h2 className="text-lg font-semibold mb-2">🔥 Activity</h2>
 
-                      <p className="text-sm text-zinc-400 mb-1">
-                        @{match.username}
-                      </p>
+        {activity.slice(0, 3).map((item) => (
+          <ActivityCard key={item.id} item={item} />
+        ))}
+      </div>
 
-                      <p className="text-sm text-zinc-400 line-clamp-2">
-                        {match.bio}
-                      </p>
-                    </div>
+      {/* 🔥 DISCOVER (MATCHES STYLE LIST) */}
+      <div className="px-4 mt-6 pb-10">
+        <h2 className="text-lg font-semibold mb-4">👀 Discover</h2>
 
-                    {/* ONLINE DOT */}
-                    <div className="flex-shrink-0">
-                      <div className="w-3 h-3 bg-green-500 rounded-full" />
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="max-w-2xl mx-auto space-y-4">
+          {users.map((user) => (
+            <Link
+              key={user.id}
+              href={`/profile/${user.username}`}
+              className="bg-zinc-800 border border-zinc-700 rounded-2xl p-4 shadow hover:bg-zinc-700 transition block"
+            >
+              <div className="flex items-center space-x-4">
+                {/* AVATAR */}
+                <div className="w-16 h-16 flex-shrink-0">
+                  <UserAvatarSquare
+                    src={user.avatar_url}
+                    username={user.username}
+                    className="!rounded-full"
+                  />
+                </div>
+
+                {/* INFO */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-lg font-semibold">
+                    {user.full_name}
+                    {user.birthdate && <> , {calculateAge(user.birthdate)}</>}
+                  </h3>
+
+                  <p className="text-sm text-zinc-400 mb-1">@{user.username}</p>
+
+                  {user.bio && (
+                    <p className="text-sm text-zinc-400 line-clamp-2">
+                      {user.bio}
+                    </p>
+                  )}
+                </div>
+
+                {/* ONLINE DOT */}
+                <div className="flex-shrink-0">
+                  <div className="w-3 h-3 bg-green-500 rounded-full" />
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
