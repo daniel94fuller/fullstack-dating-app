@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { createEvent } from "@/lib/actions/events";
 import { useRouter } from "next/navigation";
+import { createEvent } from "@/lib/actions/events";
 
 export default function CreateEventPage() {
   const router = useRouter();
@@ -11,39 +11,35 @@ export default function CreateEventPage() {
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [eventTime, setEventTime] = useState("");
-  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
 
     try {
       await createEvent({
         title,
         description,
         location,
-        eventTime,
+        event_time: eventTime, // ✅ FIXED HERE
       });
 
-      router.push("/"); // back to home
+      router.push("/");
     } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error("Error creating event:", err);
     }
   }
 
   return (
-    <div className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Create Event</h1>
+    <div className="min-h-screen bg-black text-white flex items-center justify-center px-6">
+      <form onSubmit={handleSubmit} className="w-full max-w-md space-y-4">
+        <h1 className="text-2xl font-semibold">Create Event</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
         <input
           type="text"
-          placeholder="Event Title"
+          placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="w-full p-3 rounded-lg border"
+          className="w-full p-3 rounded bg-white/10 outline-none"
           required
         />
 
@@ -51,7 +47,8 @@ export default function CreateEventPage() {
           placeholder="Description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="w-full p-3 rounded-lg border"
+          className="w-full p-3 rounded bg-white/10 outline-none"
+          required
         />
 
         <input
@@ -59,7 +56,7 @@ export default function CreateEventPage() {
           placeholder="Location"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          className="w-full p-3 rounded-lg border"
+          className="w-full p-3 rounded bg-white/10 outline-none"
           required
         />
 
@@ -67,16 +64,15 @@ export default function CreateEventPage() {
           type="datetime-local"
           value={eventTime}
           onChange={(e) => setEventTime(e.target.value)}
-          className="w-full p-3 rounded-lg border"
+          className="w-full p-3 rounded bg-white/10 outline-none"
           required
         />
 
         <button
           type="submit"
-          disabled={loading}
-          className="w-full bg-pink-500 text-white py-3 rounded-lg font-semibold"
+          className="w-full p-3 bg-white text-black rounded font-medium"
         >
-          {loading ? "Creating..." : "Create Event"}
+          Create Event
         </button>
       </form>
     </div>
