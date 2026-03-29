@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import Cropper from "react-easy-crop";
 import { createClient } from "@/lib/supabase/client";
 
@@ -12,55 +12,84 @@ export default function PhotoUpload({
   onUploadStart?: () => void;
 }) {
   const supabase = createClient();
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [imageReady, setImageReady] = useState(false);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
 
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
 
-  // 📸 Select file (FIXED)
-  const onSelectFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // 🔥 FIX: use FileReader instead of createObjectURL
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImageSrc(reader.result as string);
+  useEffect(() => {
+    document.body.style.overflow = imageSrc ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
     };
-    reader.readAsDataURL(file);
-  };
+  }, [imageSrc]);
 
-  // 🎯 Save crop
-  const onCropComplete = useCallback((_: any, croppedPixels: any) => {
-    setCroppedAreaPixels(croppedPixels);
-  }, []);
+  async function normalizeImage(file: File): Promise<string> {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = url;
 
-  // ✂️ Crop image (ANDROID SAFE)
-  async function getCroppedImage(): Promise<Blob> {
-    if (!imageSrc || !croppedAreaPixels) {
-      throw new Error("Missing crop data");
+    await new Promise((res, rej) => {
+      img.onload = res;
+      img.onerror = rej;
+    });
+
+    const max = 2000;
+    let { width, height } = img;
+
+    if (width > max || height > max) {
+      const scale = max / Math.max(width, height);
+      width *= scale;
+      height *= scale;
     }
 
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.src = imageSrc;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = width;
+    canvas.height = height;
 
-    await new Promise((resolve, reject) => {
-      image.onload = resolve;
-      image.onerror = reject;
-    });
+    ctx?.drawImage(img, 0, 0, width, height);
+
+    return canvas.toDataURL("image/jpeg", 0.95);
+  }
+
+  const onSelectFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (inputRef.current) inputRef.current.value = "";
+    if (!file) return;
+
+    setImageReady(false);
+    setCroppedAreaPixels(null);
+
+    const normalized = await normalizeImage(file);
+
+    setTimeout(() => {
+      setImageSrc(normalized);
+      setImageReady(true);
+    }, 50);
+  };
+
+  const onCropComplete = useCallback((_: any, cropped: any) => {
+    setCroppedAreaPixels(cropped);
+  }, []);
+
+  async function getCroppedImage(): Promise<Blob> {
+    const image = new Image();
+    image.src = imageSrc!;
+
+    await new Promise((res) => (image.onload = res));
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    if (!ctx) throw new Error("Canvas failed");
-
     canvas.width = croppedAreaPixels.width;
     canvas.height = croppedAreaPixels.height;
 
-    ctx.drawImage(
+    ctx?.drawImage(
       image,
       croppedAreaPixels.x,
       croppedAreaPixels.y,
@@ -72,97 +101,81 @@ export default function PhotoUpload({
       croppedAreaPixels.height,
     );
 
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(new Error("toBlob failed"));
-            return;
-          }
-          resolve(blob);
-        },
-        "image/jpeg",
-        0.9,
-      );
-    });
+    return new Promise((resolve) =>
+      canvas.toBlob((b) => resolve(b!), "image/jpeg", 0.95),
+    );
   }
 
-  // 🚀 Upload
-  async function handleUpload() {
-    if (!imageSrc || !croppedAreaPixels) return;
+  async function uploadBlob(blob: Blob) {
+    const file = new File([blob], "avatar.jpg", { type: "image/jpeg" });
+    const fileName = `${Date.now()}-${Math.random()}.jpg`;
 
+    const { data } = await supabase.storage
+      .from("profile-photos")
+      .upload(fileName, file);
+
+    const { data: publicData } = supabase.storage
+      .from("profile-photos")
+      .getPublicUrl(data!.path);
+
+    onPhotoUploaded(publicData.publicUrl);
+    setImageSrc(null);
+  }
+
+  async function handleUpload() {
+    if (!imageSrc) return;
     onUploadStart?.();
 
-    try {
-      console.log("Starting crop...");
-
-      const blob = await getCroppedImage();
-
-      console.log("Blob created:", blob);
-
-      const file = new File([blob], "avatar.jpg", {
-        type: "image/jpeg",
-      });
-
-      const fileName = `${Date.now()}-${Math.random()}.jpg`;
-
-      console.log("Uploading...");
-
-      const { data, error } = await supabase.storage
-        .from("profile-photos")
-        .upload(fileName, file);
-
-      if (error) {
-        console.error("UPLOAD ERROR:", error);
-        alert(error.message);
-        return;
-      }
-
-      const { data: publicData } = supabase.storage
-        .from("profile-photos")
-        .getPublicUrl(data.path);
-
-      const publicUrl = publicData.publicUrl;
-
-      console.log("Upload success:", publicUrl);
-
-      onPhotoUploaded(publicUrl);
-
-      setImageSrc(null);
-    } catch (err) {
-      console.error("UPLOAD FAILED:", err);
-      alert("Upload failed. Try again.");
+    if (!croppedAreaPixels) {
+      const blob = await (await fetch(imageSrc)).blob();
+      return uploadBlob(blob);
     }
+
+    const blob = await getCroppedImage();
+    await uploadBlob(blob);
   }
 
   return (
     <div>
-      {/* FILE INPUT */}
       <input
+        ref={inputRef}
         type="file"
         accept="image/*"
-        onChange={onSelectFile} // ✅ no capture → normal picker
+        onChange={onSelectFile}
       />
 
-      {/* CROP MODAL */}
-      {imageSrc && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-black p-4 rounded-xl w-[90%] max-w-md">
-            <div className="relative w-full h-80">
-              <Cropper
-                image={imageSrc}
-                crop={crop}
-                zoom={zoom}
-                aspect={1}
-                cropShape="round"
-                showGrid={false}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onCropComplete={onCropComplete}
-              />
-            </div>
+      {imageSrc && imageReady && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* HEADER (ALWAYS VISIBLE) */}
+          <div className="flex justify-between items-center px-4 py-3 border-b border-white/10">
+            <button onClick={() => setImageSrc(null)} className="text-white">
+              Cancel
+            </button>
+            <button
+              onClick={handleUpload}
+              className="bg-white text-black px-4 py-2 rounded-lg"
+            >
+              Save
+            </button>
+          </div>
 
-            {/* ZOOM */}
+          {/* CROPPER */}
+          <div className="flex-1 relative">
+            <Cropper
+              image={imageSrc}
+              crop={crop}
+              zoom={zoom}
+              aspect={1}
+              cropShape="round"
+              showGrid={false}
+              onCropChange={setCrop}
+              onZoomChange={setZoom}
+              onCropComplete={onCropComplete}
+            />
+          </div>
+
+          {/* ZOOM */}
+          <div className="px-4 py-4 pb-[env(safe-area-inset-bottom)]">
             <input
               type="range"
               min={1}
@@ -170,27 +183,8 @@ export default function PhotoUpload({
               step={0.1}
               value={zoom}
               onChange={(e) => setZoom(Number(e.target.value))}
-              className="w-full mt-4"
+              className="w-full"
             />
-
-            {/* ACTIONS */}
-            <div className="mt-4 flex justify-between">
-              <button
-                type="button"
-                onClick={() => setImageSrc(null)}
-                className="text-white"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={handleUpload}
-                className="bg-pink-500 text-white px-4 py-2 rounded-lg"
-              >
-                Save
-              </button>
-            </div>
           </div>
         </div>
       )}

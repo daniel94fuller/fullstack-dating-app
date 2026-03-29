@@ -1,94 +1,198 @@
 "use client";
 
-import { useParticipants, useTracks } from "@livekit/components-react";
-import { Track } from "livekit-client";
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
+type Participant = {
+  uid: number;
+  name?: string;
+  avatar?: string;
+};
+
+type ScoreData = {
+  unique_viewers: number;
+  watch_time: number;
+  returns: number;
+};
+
 export default function RoomParticipants({
-  focusedUserId,
-  setFocusedUserId,
+  participants,
+  focusedUid,
+  setFocusedUid,
+  roomId,
 }: {
-  focusedUserId: string | null;
-  setFocusedUserId: (id: string) => void;
+  participants: Participant[];
+  focusedUid: number | null;
+  setFocusedUid: (uid: number) => void;
+  roomId: string;
 }) {
-  const participants = useParticipants(); // 🔥 KEY CHANGE
-  const tracks = useTracks([Track.Source.Camera]);
   const supabase = createClient();
 
-  const [profiles, setProfiles] = useState<Record<string, any>>({});
+  const [scores, setScores] = useState<Record<number, ScoreData>>({});
 
-  // ✅ stable order
-  const sortedParticipants = [...participants].sort((a, b) =>
-    a.identity.localeCompare(b.identity),
-  );
+  const viewedRef = useRef<Set<number>>(new Set());
+  const lastFocusedRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number>(0);
 
-  // 🔥 fetch profiles
+  // ===============================
+  // LOAD EXISTING
+  // ===============================
   useEffect(() => {
-    async function loadProfiles() {
-      const ids = sortedParticipants.map((p) => p.identity);
-      if (ids.length === 0) return;
-
+    async function loadScores() {
       const { data } = await supabase
-        .from("users")
-        .select("id, full_name, avatar_url")
-        .in("id", ids);
+        .from("room_scores")
+        .select("*")
+        .eq("room_id", roomId);
 
       if (!data) return;
 
-      setProfiles((prev) => {
-        const updated = { ...prev };
-        data.forEach((user) => {
-          updated[user.id] = user;
+      const map: Record<number, ScoreData> = {};
+
+      data.forEach((row: any) => {
+        map[row.uid] = {
+          unique_viewers: row.unique_viewers,
+          watch_time: row.watch_time,
+          returns: row.returns,
+        };
+      });
+
+      setScores(map);
+    }
+
+    loadScores();
+  }, [roomId]);
+
+  // ===============================
+  // REALTIME
+  // ===============================
+  useEffect(() => {
+    const channel = supabase
+      .channel("room_scores_" + roomId)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "room_scores",
+          filter: `room_id=eq.${roomId}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+
+          setScores((prev) => ({
+            ...prev,
+            [row.uid]: {
+              unique_viewers: row.unique_viewers,
+              watch_time: row.watch_time,
+              returns: row.returns,
+            },
+          }));
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [roomId]);
+
+  // ===============================
+  // UPDATE SCORE
+  // ===============================
+  async function updateScore(uid: number, updates: Partial<ScoreData>) {
+    const existing = scores[uid] || {
+      unique_viewers: 0,
+      watch_time: 0,
+      returns: 0,
+    };
+
+    const newData = {
+      ...existing,
+      ...updates,
+    };
+
+    setScores((prev) => ({
+      ...prev,
+      [uid]: newData,
+    }));
+
+    await supabase.from("room_scores").upsert({
+      room_id: roomId,
+      uid,
+      unique_viewers: newData.unique_viewers,
+      watch_time: newData.watch_time,
+      returns: newData.returns,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  // ===============================
+  // TRACK FOCUS
+  // ===============================
+  useEffect(() => {
+    if (!focusedUid) return;
+
+    if (lastFocusedRef.current !== null) {
+      const prevUid = lastFocusedRef.current;
+      const duration = (Date.now() - startTimeRef.current) / 1000;
+
+      if (duration >= 5) {
+        updateScore(prevUid, {
+          watch_time:
+            (scores[prevUid]?.watch_time || 0) + Math.min(duration, 180),
         });
-        return updated;
+      }
+    }
+
+    startTimeRef.current = Date.now();
+
+    const hasViewed = viewedRef.current.has(focusedUid);
+    viewedRef.current.add(focusedUid);
+
+    if (!hasViewed) {
+      updateScore(focusedUid, {
+        unique_viewers: (scores[focusedUid]?.unique_viewers || 0) + 1,
+      });
+    } else {
+      updateScore(focusedUid, {
+        returns: (scores[focusedUid]?.returns || 0) + 1,
       });
     }
 
-    loadProfiles();
-  }, [participants]);
+    lastFocusedRef.current = focusedUid;
+  }, [focusedUid]);
 
+  // ===============================
+  // SORT
+  // ===============================
+  const sortedParticipants = [...participants].sort((a, b) => {
+    return (scores[b.uid]?.watch_time || 0) - (scores[a.uid]?.watch_time || 0);
+  });
+
+  // ===============================
+  // UI (COUNTS HIDDEN)
+  // ===============================
   return (
-    <div className="flex gap-3 overflow-x-auto px-4 py-2 bg-black/60">
+    <div className="flex gap-4 w-full px-4 overflow-x-auto">
       {sortedParticipants.map((p) => {
-        const id = p.identity;
-        const user = profiles[id];
-        const isActive = id === focusedUserId;
-
-        // 🔥 check if they actually have video
-        const hasVideo = tracks.some((t) => t.participant.identity === id);
-
         return (
           <div
-            key={id}
-            onClick={() => setFocusedUserId(id)}
-            className="flex flex-col items-center gap-1 cursor-pointer"
+            key={p.uid}
+            onClick={() => setFocusedUid(p.uid)}
+            className="flex flex-col items-center cursor-pointer flex-shrink-0"
           >
-            {/* avatar */}
-            <div
-              className={`relative w-16 h-16 rounded-full overflow-hidden border-2 ${
-                isActive ? "border-white" : "border-transparent"
-              }`}
-            >
-              {user?.avatar_url ? (
-                <Image
-                  src={user.avatar_url}
-                  alt={user.full_name}
-                  fill
-                  sizes="64px"
-                  className={`object-cover ${!hasVideo ? "opacity-50" : ""}`}
-                />
-              ) : (
-                <div className="w-full h-full bg-black flex items-center justify-center text-white text-xs">
-                  {id.slice(0, 2).toUpperCase()}
-                </div>
-              )}
+            <div className="relative">
+              <img
+                src={p.avatar || "/default-avatar.png"}
+                className={`w-16 h-16 rounded-full object-cover border-2 ${
+                  focusedUid === p.uid ? "border-white" : "border-transparent"
+                }`}
+              />
             </div>
 
-            <p className="text-white text-xs text-center max-w-[64px] truncate">
-              {user?.full_name || "User"}
-            </p>
+            <div className="text-white text-xs mt-1 text-center whitespace-nowrap">
+              {p.name || "User"}
+            </div>
           </div>
         );
       })}

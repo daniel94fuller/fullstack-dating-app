@@ -1,58 +1,44 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useAuth } from "@/contexts/auth-context";
-import VideoRoom from "@/components/VideoRoom";
+import { useEffect, useState, use } from "react";
+import dynamic from "next/dynamic";
 import { createClient } from "@/lib/supabase/client";
-import { use } from "react";
+
+// 🔥 disable SSR for Agora
+const AgoraRoom = dynamic(() => import("@/components/AgoraRoom"), {
+  ssr: false,
+});
 
 export default function RoomPage(props: any) {
   const params = use(props.params);
-
-  const { user } = useAuth();
   const supabase = createClient();
 
-  const [token, setToken] = useState("");
+  const [uid, setUid] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    async function joinRoom() {
-      try {
-        const res = await fetch(
-          `/api/livekit-token?room=${params.roomId}&username=${user.id}`,
-        );
+      console.log("AUTH USER:", user);
 
-        const data = await res.json();
-        setToken(data.token);
+      if (!user) return;
 
-        await supabase
-          .from("rooms")
-          .update({ last_active: new Date().toISOString() })
-          .eq("id", params.roomId);
-      } catch (err) {
-        console.error("JOIN ROOM ERROR:", err);
-      }
+      // 🔥 THIS IS THE REAL UUID
+      setUid(user.id);
     }
 
-    joinRoom();
-  }, [user, params.roomId]);
+    loadUser();
+  }, []);
 
-  if (!user) {
-    return <div className="text-white p-6">Sign in to join this room</div>;
-  }
-
-  if (!token) {
+  if (!uid) {
     return (
-      <div className="h-[calc(100vh-60px)] flex items-center justify-center text-white">
-        Connecting to room...
+      <div className="h-screen flex items-center justify-center">
+        Loading user...
       </div>
     );
   }
 
-  return (
-    <div className="h-[calc(100vh-60px)]">
-      <VideoRoom token={token} />
-    </div>
-  );
+  return <AgoraRoom channel={params.roomId} uid={uid} />;
 }

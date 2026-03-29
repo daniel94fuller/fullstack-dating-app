@@ -11,41 +11,48 @@ export default function ProfilePostCard({
   onLike: (id: string) => void;
   onPass: (id: string) => void;
 }) {
-  const firstName = user.full_name?.split(" ")[0] || "User";
-
   return (
-    <div className="relative rounded-2xl overflow-hidden bg-black border border-white/10">
-      {/* IMAGE */}
-      <img
-        src={user.avatar_url || "/default-avatar.png"}
-        className="w-full h-[420px] object-cover"
-      />
+    <div className="w-full flex justify-center">
+      {/* 🔥 MAX WIDTH CONTAINER (prevents stretching) */}
+      <div className="w-full max-w-[420px]">
+        <div className="rounded-2xl overflow-hidden bg-black border border-white/10">
+          {/* 🔥 SQUARE IMAGE */}
+          <div className="w-full aspect-square bg-black">
+            <img
+              src={user.avatar_url}
+              alt={user.full_name}
+              className="w-full h-full object-cover"
+            />
+          </div>
 
-      {/* OVERLAY (gradient) */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+          {/* INFO */}
+          <div className="p-4 space-y-2">
+            {/* NAME */}
+            <h3 className="text-lg font-semibold">{user.full_name}</h3>
 
-      {/* NAME */}
-      <div className="absolute bottom-20 left-4 text-white">
-        <h2 className="text-xl font-semibold">{firstName}</h2>
-      </div>
+            {/* META */}
+            <p className="text-sm text-gray-400">
+              San Francisco • Friendship, Networking
+            </p>
 
-      {/* ACTION BUTTONS */}
-      <div className="absolute bottom-4 left-0 right-0 flex justify-between px-6">
-        {/* ❌ NOT INTERESTED */}
-        <button
-          onClick={() => onPass(user.id)}
-          className="bg-white/10 backdrop-blur px-4 py-2 rounded-full text-sm"
-        >
-          ❌ Not Interested
-        </button>
+            {/* ACTIONS */}
+            <div className="flex gap-3 pt-3">
+              <button
+                onClick={() => onPass(user.id)}
+                className="flex-1 h-11 rounded-xl bg-white/5 border border-white/10 text-sm"
+              >
+                Not interested
+              </button>
 
-        {/* ✅ INTERESTED */}
-        <button
-          onClick={() => onLike(user.id)}
-          className="bg-green-500 px-4 py-2 rounded-full text-sm flex items-center gap-1"
-        >
-          ✔ Interested
-        </button>
+              <button
+                onClick={() => onLike(user.id)}
+                className="flex-1 h-11 rounded-xl bg-gradient-to-r from-pink-500 to-red-500 text-white text-sm font-medium"
+              >
+                Interested
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/auth-context";
-import Navbar from "@/components/Navbar";
+import LayoutClient from "@/components/LayoutClient";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,26 +15,24 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "popcircle - Find Your Perfect Match",
+  title:
+    "Popcircle - A place to hangout, meet new people, and find your circle",
   description:
     "Connect with like-minded people through live streaming, meaningful conversations, and authentic connections on popcircle.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html lang="en" className="h-full">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
         <AuthProvider>
-          <div className="h-full flex flex-col">
-            <Navbar />
-            {children}
-          </div>
+          <LayoutClient>{children}</LayoutClient>
         </AuthProvider>
       </body>
     </html>

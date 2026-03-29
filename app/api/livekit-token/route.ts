@@ -11,23 +11,31 @@ export async function GET(req: Request) {
     return new NextResponse("Missing params", { status: 400 });
   }
 
-  // 🔥 CREATE TOKEN (NO SUPABASE)
-  const at = new AccessToken(
-    process.env.LIVEKIT_API_KEY!,
-    process.env.LIVEKIT_API_SECRET!,
-    {
-      identity: username,
-    },
-  );
+  try {
+    const at = new AccessToken(
+      process.env.LIVEKIT_API_KEY!,
+      process.env.LIVEKIT_API_SECRET!,
+      {
+        identity: username,
+        // Token expires after 6 hours — prevents stale tokens from being
+        // reused in a new session with a conflicting identity claim.
+        ttl: "6h",
+      },
+    );
 
-  at.addGrant({
-    room,
-    roomJoin: true,
-    canPublish: true,
-    canSubscribe: true,
-  });
+    at.addGrant({
+      room,
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: true,
+    });
 
-  const token = await at.toJwt();
+    const token = await at.toJwt();
 
-  return NextResponse.json({ token });
+    return NextResponse.json({ token });
+  } catch (err) {
+    console.error("TOKEN ERROR:", err);
+    return new NextResponse("Token error", { status: 500 });
+  }
 }

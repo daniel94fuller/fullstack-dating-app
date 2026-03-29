@@ -17,7 +17,7 @@ export default function AuthPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
 
-  // 🔥 SMART REDIRECT (based on profile completeness)
+  // 🔥 SMART REDIRECT
   useEffect(() => {
     async function checkProfile() {
       if (!user || authLoading) return;
@@ -76,8 +76,6 @@ export default function AuthPage() {
           await ensureUserExists(data.user);
         }
       }
-
-      // ❌ No redirect here — handled by useEffect
     } catch (err: any) {
       console.log("AUTH ERROR:", err);
       setError(err.message || "Something went wrong");
@@ -86,7 +84,6 @@ export default function AuthPage() {
     }
   }
 
-  // 🔥 CREATE USER ONLY IF NOT EXISTS
   async function ensureUserExists(user: any) {
     const { data: existing } = await supabase
       .from("users")
@@ -107,7 +104,7 @@ export default function AuthPage() {
       avatar_url: "",
       instagram: "",
       gender: "other",
-      birthdate: null, // 🔥 force onboarding
+      birthdate: null,
       location: "San Francisco",
     });
 
@@ -119,59 +116,70 @@ export default function AuthPage() {
   if (authLoading) return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="max-w-md w-full space-y-8 p-8">
-        <div className="text-center">
-          <Logo />
-          <p className="opacity-70">
-            {isSignUp ? "Create Your Account" : "Sign in to your account"}
-          </p>
+    <div className="min-h-screen flex flex-col justify-center px-6 py-10 overflow-y-auto">
+      {/* LOGO */}
+      <div className="text-center mb-10">
+        <Logo />
+        <h1 className="text-2xl font-semibold mt-6">
+          {isSignUp ? "Create account" : "Welcome back"}
+        </h1>
+        <p className="text-sm text-gray-400 mt-2">
+          {isSignUp ? "Sign up to start meeting people" : "Sign in to continue"}
+        </p>
+      </div>
+
+      {/* FORM */}
+      <form onSubmit={handleAuth} className="w-full max-w-md mx-auto space-y-5">
+        {/* EMAIL */}
+        <div>
+          <label className="text-xs text-gray-400 mb-1 block">Email</label>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
+          />
         </div>
 
-        <form className="space-y-6" onSubmit={handleAuth}>
-          <div>
-            <label className="block text-sm mb-1">Email</label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm mb-1">Password</label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input"
-            />
-          </div>
-
-          {error && <div className="text-red-500 text-sm">{error}</div>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="match-button w-full"
-          >
-            {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
-          </button>
-        </form>
-
-        <div className="text-center">
-          <button
-            onClick={() => setIsSignUp(!isSignUp)}
-            className="text-pink-500 text-sm"
-          >
-            {isSignUp
-              ? "Already have an account? Sign in"
-              : "Don't have an account? Sign up"}
-          </button>
+        {/* PASSWORD */}
+        <div>
+          <label className="text-xs text-gray-400 mb-1 block">Password</label>
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full h-12 px-4 rounded-xl bg-white/5 border border-white/10 focus:border-pink-500 focus:ring-1 focus:ring-pink-500 outline-none transition"
+          />
         </div>
+
+        {/* ERROR */}
+        {error && (
+          <div className="text-red-400 text-sm text-center">{error}</div>
+        )}
+
+        {/* BUTTON */}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full h-12 rounded-xl bg-gradient-to-r from-pink-500 to-red-500 font-medium text-white transition active:scale-[0.98] disabled:opacity-50"
+        >
+          {loading ? "Loading..." : isSignUp ? "Create account" : "Sign in"}
+        </button>
+      </form>
+
+      {/* SWITCH */}
+      <div className="text-center mt-8">
+        <button
+          onClick={() => setIsSignUp(!isSignUp)}
+          className="text-sm text-gray-400"
+        >
+          {isSignUp ? "Already have an account?" : "New here?"}{" "}
+          <span className="text-pink-500 font-medium">
+            {isSignUp ? "Sign in" : "Create account"}
+          </span>
+        </button>
       </div>
     </div>
   );

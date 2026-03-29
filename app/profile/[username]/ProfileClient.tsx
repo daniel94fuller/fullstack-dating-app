@@ -1,12 +1,53 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import UserAvatarBubble from "@/components/UserAvatarBubble";
 import MatchFeedItem from "@/components/MatchFeedItem";
 import Link from "next/link";
 
+// 🔥 helper: get last Sunday 7PM PST
+function getWeeklyWindow() {
+  const now = new Date();
+
+  // convert to PST
+  const pstOffset = -8; // ignoring DST for now (good enough for MVP)
+  const local = new Date(
+    now.getTime() + now.getTimezoneOffset() * 60000 + pstOffset * 3600000,
+  );
+
+  const day = local.getDay(); // 0 = Sunday
+  const diffToSunday = day; // days since last Sunday
+
+  const lastSunday = new Date(local);
+  lastSunday.setDate(local.getDate() - diffToSunday);
+  lastSunday.setHours(19, 0, 0, 0); // 7PM
+
+  // if it's before Sunday 7PM, go back another week
+  if (local < lastSunday) {
+    lastSunday.setDate(lastSunday.getDate() - 7);
+  }
+
+  const nextSunday = new Date(lastSunday);
+  nextSunday.setDate(lastSunday.getDate() + 7);
+
+  return {
+    start: lastSunday,
+    end: nextSunday,
+  };
+}
+
 export default function ProfileClient({ user, matchCount, feed }: any) {
   const [showCircle, setShowCircle] = useState(false);
+
+  // 🔥 weekly counter
+  const weeklyCount = useMemo(() => {
+    const { start, end } = getWeeklyWindow();
+
+    return feed.filter((item: any) => {
+      const created = new Date(item.created_at);
+      return created >= start && created < end;
+    }).length;
+  }, [feed]);
 
   return (
     <div className="w-full px-6 py-10">
@@ -62,7 +103,15 @@ export default function ProfileClient({ user, matchCount, feed }: any) {
               active:scale-95
             "
           >
-            <p className="text-lg font-semibold">{matchCount}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-lg font-semibold">{matchCount}</p>
+
+              {/* 🔥 WEEKLY +COUNTER */}
+              <span className="text-xs text-green-400 font-semibold">
+                +{weeklyCount}
+              </span>
+            </div>
+
             <p className="text-xs opacity-70">Circle</p>
           </button>
         </div>
@@ -79,7 +128,7 @@ export default function ProfileClient({ user, matchCount, feed }: any) {
               userA={item.user1}
               userB={item.user2}
               created_at={item.created_at}
-              currentUserId={user.id} // ✅ FIXED
+              currentUserId={user.id}
             />
           ))
         )}

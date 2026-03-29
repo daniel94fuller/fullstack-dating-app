@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 interface AuthContextType {
   user: User | null;
@@ -14,11 +14,17 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const router = useRouter();
+  // FIX: createClient() must be stable — creating it in the component body
+  // produces a new object reference on every render, which makes the useEffect
+  // below re-fire (supabase is in its dep array), which calls setUser(),
+  // which re-renders, which creates a new supabase client... infinite loop.
+  // useRef gives us one stable instance for the lifetime of this component.
+  const supabaseRef = useRef(createClient());
+  const supabase = supabaseRef.current;
 
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true); // ✅ start true
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let mounted = true;
@@ -27,17 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data, error } = await supabase.auth.getSession();
 
-        // 🔥 HANDLE BROKEN REFRESH TOKEN
         if (error) {
           console.warn("Session error:", error.message);
-
           if (error.message.includes("Refresh Token")) {
-            await supabase.auth.signOut(); // clean bad state
+            await supabase.auth.signOut();
           }
         }
 
         if (!mounted) return;
-
         setUser(data.session?.user ?? null);
       } catch (err) {
         console.error("Auth init error:", err);
@@ -48,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initAuth();
 
-    // 🔥 CORRECT listener setup
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -57,9 +59,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false;
-      subscription.unsubscribe(); // ✅ properly cleaned
+      subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []); // FIX: empty dep array — supabase is now stable via ref, no need
+  // to list it here. This effect runs once on mount only.
 
   async function signOut() {
     try {
