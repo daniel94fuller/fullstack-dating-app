@@ -99,51 +99,95 @@ export default function AgoraRoom({
   };
 
   // ===============================
-  // 🔥 LEAVE (UPDATED)
+  // 🔥 LEAVE
   // ===============================
   const leave = async () => {
-    const { mic, cam } = localTracksRef.current;
+    try {
+      const client = clientRef.current;
+      const { mic, cam } = localTracksRef.current;
 
-    mic?.stop();
-    mic?.close();
-    cam?.stop();
-    cam?.close();
+      if (client && (mic || cam)) {
+        await client.unpublish([mic, cam].filter(Boolean));
+      }
 
-    await clientRef.current?.leave();
+      if (mic) {
+        mic.stop();
+        mic.close();
+      }
 
-    if (subRef.current) {
-      await supabase.removeChannel(subRef.current);
-    }
+      if (cam) {
+        cam.stop();
+        cam.close();
+      }
 
-    const { data: roomBefore } = await supabase
-      .from("rooms")
-      .select("active_count")
-      .eq("id", channel)
-      .single();
+      localTracksRef.current = { mic: null, cam: null };
 
-    const newCount = Math.max((roomBefore?.active_count || 1) - 1, 0);
+      await client?.leave();
 
-    const { error: updateError } = await supabase
-      .from("rooms")
-      .update({ active_count: newCount })
-      .eq("id", channel);
+      if (subRef.current) {
+        await supabase.removeChannel(subRef.current);
+        subRef.current = null;
+      }
 
-    console.log("update active_count:", newCount, updateError);
-
-    if (newCount === 0) {
-      console.log("🧹 deleting room:", channel);
-
-      const { error: deleteError } = await supabase
+      const { data: roomBefore } = await supabase
         .from("rooms")
-        .delete()
+        .select("active_count")
+        .eq("id", channel)
+        .single();
+
+      const newCount = Math.max((roomBefore?.active_count || 1) - 1, 0);
+
+      const { error: updateError } = await supabase
+        .from("rooms")
+        .update({ active_count: newCount })
         .eq("id", channel);
 
-      console.log("delete result:", deleteError);
-    }
+      console.log("update active_count:", newCount, updateError);
 
-    setParticipants([]);
-    setJoined(false);
+      if (newCount === 0) {
+        console.log("🧹 deleting room:", channel);
+
+        const { error: deleteError } = await supabase
+          .from("rooms")
+          .delete()
+          .eq("id", channel);
+
+        console.log("delete result:", deleteError);
+      }
+
+      setParticipants([]);
+      setJoined(false);
+    } catch (err) {
+      console.error("❌ leave error:", err);
+    }
   };
+
+  // ===============================
+  // 🔥 ADD THIS (ONLY CHANGE)
+  // ===============================
+  useEffect(() => {
+    const handleUnload = () => {
+      const { mic, cam } = localTracksRef.current;
+
+      try {
+        mic?.stop();
+        mic?.close();
+        cam?.stop();
+        cam?.close();
+      } catch (e) {}
+
+      try {
+        clientRef.current?.leave();
+      } catch (e) {}
+    };
+
+    window.addEventListener("beforeunload", handleUnload);
+
+    return () => {
+      handleUnload();
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, []);
 
   const handleClickUser = (uid: number) => {
     setCounts((prev) => ({
@@ -355,7 +399,6 @@ export default function AgoraRoom({
       </div>
 
       <div className="absolute bottom-4 w-full">
-        {/* 🔥 ACTIVE SPEAKER OVERLAY */}
         {activeSpeaker !== null &&
           (() => {
             const speaker = participants.find((p) => p.uid === activeSpeaker);
@@ -375,6 +418,7 @@ export default function AgoraRoom({
               </div>
             );
           })()}
+
         <RoomParticipants
           participants={participants}
           focusedUid={focusedUid}
