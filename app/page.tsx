@@ -2,8 +2,6 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { useEffect, useState, useMemo } from "react";
-// ❌ removed broken import
-// import { UserProfile } from "@/app/profile/page";
 import UserAvatarBubble from "@/components/UserAvatarBubble";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,6 +40,7 @@ export default function Home() {
   const [showSentLikes, setShowSentLikes] = useState(false);
 
   const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set());
+  const [circleCounts, setCircleCounts] = useState<Record<string, number>>({}); // ✅ NEW
   const [ready, setReady] = useState(false);
 
   // ===============================
@@ -52,7 +51,26 @@ export default function Home() {
       try {
         const users = await getAllUsers();
 
+        // ===============================
+        // 🔥 GLOBAL CIRCLE COUNTS
+        // ===============================
+        const { data: allMatches } = await supabase
+          .from("matches")
+          .select("user1_id, user2_id")
+          .eq("is_active", true);
+
+        const counts: Record<string, number> = {};
+
+        allMatches?.forEach((m) => {
+          counts[m.user1_id] = (counts[m.user1_id] || 0) + 1;
+          counts[m.user2_id] = (counts[m.user2_id] || 0) + 1;
+        });
+
+        setCircleCounts(counts);
+
+        // ===============================
         // GUEST MODE
+        // ===============================
         if (!user) {
           setDiscoverUsers(users.slice(0, 10));
           setActivity([]);
@@ -149,17 +167,16 @@ export default function Home() {
   }, [user]);
 
   // ===============================
-  // SORT: MOST IN CIRCLE → LEAST
+  // 🔥 SORT BY GLOBAL CIRCLE COUNT
   // ===============================
   const sortedDiscover = useMemo(() => {
-    if (!user) return discoverUsers;
-
     return [...discoverUsers].sort((a, b) => {
-      const aScore = matchedIds.has(a.id) ? 1 : 0;
-      const bScore = matchedIds.has(b.id) ? 1 : 0;
+      const aScore = circleCounts[a.id] || 0;
+      const bScore = circleCounts[b.id] || 0;
+
       return bScore - aScore;
     });
-  }, [discoverUsers, matchedIds, user]);
+  }, [discoverUsers, circleCounts]);
 
   // ===============================
   // AUTH CHECK
@@ -223,11 +240,7 @@ export default function Home() {
                   href={`/profile/${u.username}`}
                   className="flex flex-col items-center min-w-[70px]"
                 >
-                  <UserAvatarBubble
-                    src={u.avatar_url}
-                    username={u.username}
-                    size={80}
-                  />
+                  <UserAvatarBubble src={u.avatar_url} size={80} />
                   <p className="text-xs mt-1 text-center truncate w-full">
                     {u.full_name}
                   </p>
