@@ -1,16 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { UserProfile } from "@/app/profile/page";
 import { calculateAge } from "@/lib/helpers/calculate-age";
 import UserAvatarSquare from "./UserAvatarSquare";
 
+// ✅ LOCAL TYPE (correct)
 type UserProfile = {
   id: string;
   username?: string;
   full_name?: string;
   avatar_url?: string;
   birthday?: string;
+  bio?: string;
 };
 
 export default function MatchCard({ user }: { user: UserProfile }) {
@@ -38,7 +39,8 @@ export default function MatchCard({ user }: { user: UserProfile }) {
             <div className="flex items-end justify-between">
               <div>
                 <h2 className="text-2xl font-bold mb-1">
-                  {user.full_name}, {calculateAge(user.birthdate)}
+                  {user.full_name},{" "}
+                  {user.birthday ? calculateAge(user.birthday) : ""}
                 </h2>
 
                 <p className="text-sm opacity-90 mb-2">@{user.username}</p>
