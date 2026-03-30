@@ -1,5 +1,25 @@
-import { UserProfile } from "@/app/profile/page";
 import { createClient } from "../supabase/client";
+
+// ✅ LOCAL TYPE (matches your app usage)
+type UserProfile = {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+  birthday?: string;
+  bio?: string;
+  email?: string;
+  gender?: string;
+  birthdate?: string;
+  preferences?: any;
+  location_lat?: number;
+  location_lng?: number;
+  last_active?: string;
+  is_verified?: boolean;
+  is_online?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
 
 // 🔥 ALL USERS (FOR HOME BUBBLES)
 export async function getAllUsers(): Promise<UserProfile[]> {
@@ -89,7 +109,7 @@ export async function getPotentialMatches(): Promise<UserProfile[]> {
   }
 }
 
-// ✅ FIXED LIKE USER (NO DUPLICATES + MATCH CREATION)
+// ✅ LIKE USER
 export async function likeUser(toUserId: string) {
   try {
     const supabase = await createClient();
@@ -100,7 +120,6 @@ export async function likeUser(toUserId: string) {
 
     if (!user) return { success: false };
 
-    // ✅ CHECK IF ALREADY LIKED
     const { data: existing } = await supabase
       .from("likes")
       .select("id")
@@ -120,7 +139,6 @@ export async function likeUser(toUserId: string) {
       }
     }
 
-    // ✅ CHECK FOR MUTUAL LIKE
     const { data: mutual } = await supabase
       .from("likes")
       .select("id")
@@ -129,7 +147,6 @@ export async function likeUser(toUserId: string) {
       .maybeSingle();
 
     if (mutual) {
-      // ✅ PREVENT DUPLICATE MATCHES
       const { data: existingMatch } = await supabase
         .from("matches")
         .select("id")
@@ -166,7 +183,7 @@ export async function likeUser(toUserId: string) {
   }
 }
 
-// ✅ SAFE SKIP USER (NO DUPLICATES)
+// ✅ SKIP USER
 export async function skipUser(toUserId: string) {
   const supabase = await createClient();
 
