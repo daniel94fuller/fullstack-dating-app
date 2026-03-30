@@ -2,11 +2,20 @@
 
 import { getPotentialMatches, likeUser } from "@/lib/actions/matches";
 import { useEffect, useState } from "react";
-import { UserProfile } from "../profile/page";
+// ❌ removed bad import
+// import { UserProfile } from "../profile/page";
 import { useRouter } from "next/navigation";
 import MatchCard from "@/components/MatchCard";
 import MatchButtons from "@/components/MatchButtons";
 import MatchNotification from "@/components/MatchNotification";
+
+// ✅ added local type (ONLY addition)
+type UserProfile = {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+};
 
 export default function MatchesPage() {
   const [potentialMatches, setPotentialMatches] = useState<UserProfile[]>([]);
@@ -68,7 +77,6 @@ export default function MatchesPage() {
     }
   }
 
-  // 🔄 LOADING
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -80,7 +88,6 @@ export default function MatchesPage() {
     );
   }
 
-  // 🛑 NO MORE USERS
   if (currentIndex >= potentialMatches.length) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -117,7 +124,6 @@ export default function MatchesPage() {
   return (
     <div className="h-screen overflow-y-auto">
       <div className="container mx-auto px-4 py-8">
-        {/* HEADER */}
         <header className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <button
@@ -152,7 +158,6 @@ export default function MatchesPage() {
           </div>
         </header>
 
-        {/* CARD */}
         <div className="max-w-md mx-auto">
           <MatchCard user={currentPotentialMatch} />
 
@@ -161,7 +166,6 @@ export default function MatchesPage() {
           </div>
         </div>
 
-        {/* MATCH MODAL */}
         {showMatchNotification && matchedUser && (
           <MatchNotification
             match={matchedUser}
