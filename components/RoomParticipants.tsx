@@ -20,11 +20,15 @@ export default function RoomParticipants({
   focusedUid,
   setFocusedUid,
   roomId,
+  counts,
+  onClickUser,
 }: {
   participants: Participant[];
   focusedUid: number | null;
   setFocusedUid: (uid: number) => void;
-  roomId: string;
+  roomId?: string; // ✅ made optional
+  counts?: Record<number, number>; // ✅ added (safe)
+  onClickUser?: (uid: number) => void; // ✅ added (safe)
 }) {
   const supabase = createClient();
 
@@ -38,6 +42,8 @@ export default function RoomParticipants({
   // LOAD EXISTING
   // ===============================
   useEffect(() => {
+    if (!roomId) return; // ✅ guard
+
     async function loadScores() {
       const { data } = await supabase
         .from("room_scores")
@@ -66,6 +72,8 @@ export default function RoomParticipants({
   // REALTIME
   // ===============================
   useEffect(() => {
+    if (!roomId) return; // ✅ guard
+
     const channel = supabase
       .channel("room_scores_" + roomId)
       .on(
@@ -100,6 +108,8 @@ export default function RoomParticipants({
   // UPDATE SCORE
   // ===============================
   async function updateScore(uid: number, updates: Partial<ScoreData>) {
+    if (!roomId) return; // ✅ guard
+
     const existing = scores[uid] || {
       unique_viewers: 0,
       watch_time: 0,
@@ -170,7 +180,7 @@ export default function RoomParticipants({
   });
 
   // ===============================
-  // UI (COUNTS HIDDEN)
+  // UI
   // ===============================
   return (
     <div className="flex gap-4 w-full px-4 overflow-x-auto">
@@ -178,7 +188,10 @@ export default function RoomParticipants({
         return (
           <div
             key={p.uid}
-            onClick={() => setFocusedUid(p.uid)}
+            onClick={() => {
+              setFocusedUid(p.uid);
+              onClickUser?.(p.uid); // ✅ safe optional
+            }}
             className="flex flex-col items-center cursor-pointer flex-shrink-0"
           >
             <div className="relative">
