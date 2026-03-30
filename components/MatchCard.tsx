@@ -5,6 +5,14 @@ import { UserProfile } from "@/app/profile/page";
 import { calculateAge } from "@/lib/helpers/calculate-age";
 import UserAvatarSquare from "./UserAvatarSquare";
 
+type UserProfile = {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+  birthday?: string;
+};
+
 export default function MatchCard({ user }: { user: UserProfile }) {
   const router = useRouter();
 
