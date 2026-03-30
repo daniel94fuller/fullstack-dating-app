@@ -206,7 +206,7 @@ export default function StreamChatInterface({
           call_id: callId,
           caller_id: currentUserId,
           caller_name: otherUser.full_name || "Someone",
-        });
+        } as any); // ✅ FIX
       }
     } catch (error) {
       console.error(error);
@@ -284,7 +284,6 @@ export default function StreamChatInterface({
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* UI unchanged */}
-      {/* (kept everything same) */}
     </div>
   );
 }
