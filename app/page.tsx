@@ -2,7 +2,8 @@
 
 import { useAuth } from "@/contexts/auth-context";
 import { useEffect, useState, useMemo } from "react";
-import { UserProfile } from "@/app/profile/page";
+// ❌ removed broken import
+// import { UserProfile } from "@/app/profile/page";
 import UserAvatarBubble from "@/components/UserAvatarBubble";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +17,14 @@ import {
   skipUser,
 } from "@/lib/actions/matches";
 import { createClient } from "@/lib/supabase/client";
+
+// ✅ ONLY addition
+type UserProfile = {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+};
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -249,7 +258,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ACTIVITY (RESTORED) */}
+      {/* ACTIVITY */}
       {user && activity.length > 0 && (
         <div className="px-4 mt-6">
           <h2 className="text-lg font-semibold mb-3">Activity</h2>
@@ -286,7 +295,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* SHOW INTERESTED (RESTORED) */}
+      {/* SHOW INTERESTED */}
       {user && sentLikes.length > 0 && (
         <div className="px-4 mt-6">
           <button
@@ -310,7 +319,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* NOT INTERESTED (RESTORED) */}
+      {/* NOT INTERESTED */}
       {user && skippedUsers.length > 0 && (
         <div className="px-4 mt-6 pb-20">
           <button
