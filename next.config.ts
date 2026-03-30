@@ -1,28 +1,13 @@
 import type { NextConfig } from "next";
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
-      },
-      {
-        protocol: "https",
-        hostname: "imljzgcuelzzzncfzlnc.supabase.co",
-      },
-      {
-        protocol: "https",
-        hostname: "i.pravatar.cc",
-      },
-      {
-        protocol: "https",
-        hostname: "res.cloudinary.com",
-      },
-      {
-        protocol: "https",
-        hostname: "xfdclkiezvhpqfjjdehz.supabase.co",
-      },
+      { protocol: "https", hostname: "images.unsplash.com" },
+      { protocol: "https", hostname: "imljzgcuelzzzncfzlnc.supabase.co" },
+      { protocol: "https", hostname: "i.pravatar.cc" },
+      { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "xfdclkiezvhpqfjjdehz.supabase.co" },
     ],
   },
 
@@ -31,10 +16,6 @@ const nextConfig = {
       bodySizeLimit: "50mb",
     },
   },
-
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-} satisfies NextConfig;
+};
 
 export default nextConfig;
