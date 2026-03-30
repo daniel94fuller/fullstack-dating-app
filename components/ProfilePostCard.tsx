@@ -1,6 +1,14 @@
 "use client";
 
-import { UserProfile } from "@/app/profile/page";
+// ✅ LOCAL TYPE (consistent with others)
+type UserProfile = {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+  birthday?: string;
+  bio?: string;
+};
 
 export default function ProfilePostCard({
   user,
