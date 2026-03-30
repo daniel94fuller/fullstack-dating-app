@@ -1,7 +1,27 @@
 "use server";
 
-import { UserProfile } from "@/app/profile/page";
 import { createClient } from "../supabase/server";
+
+// ✅ LOCAL TYPE (same as everywhere else)
+type UserProfile = {
+  id: string;
+  username?: string;
+  full_name?: string;
+  avatar_url?: string;
+  birthday?: string;
+  bio?: string;
+  email?: string;
+  gender?: string;
+  birthdate?: string;
+  preferences?: any;
+  location_lat?: number;
+  location_lng?: number;
+  last_active?: string;
+  is_verified?: boolean;
+  is_online?: boolean;
+  created_at?: string;
+  updated_at?: string;
+};
 
 export async function getCurrentUserProfile() {
   const supabase = await createClient();
