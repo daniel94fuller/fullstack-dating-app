@@ -8,15 +8,25 @@ const AgoraRoom = dynamic(() => import("@/components/AgoraRoom"), {
   ssr: false,
 });
 
-// ✅ FIX: properly type params
-export default function RoomPage({ params }: { params: { roomId: string } }) {
+// ✅ FIX: params is now a Promise
+export default function RoomPage(props: {
+  params: Promise<{ roomId: string }>;
+}) {
   const [uid, setUid] = useState<number | null>(null);
+  const [roomId, setRoomId] = useState<string | null>(null);
 
   useEffect(() => {
     setUid(Math.floor(Math.random() * 1000000));
-  }, []);
 
-  if (!uid) {
+    async function loadParams() {
+      const p = await props.params;
+      setRoomId(p.roomId);
+    }
+
+    loadParams();
+  }, [props.params]);
+
+  if (!uid || !roomId) {
     return (
       <div className="h-screen flex items-center justify-center">
         Loading...
@@ -24,5 +34,5 @@ export default function RoomPage({ params }: { params: { roomId: string } }) {
     );
   }
 
-  return <AgoraRoom channel={params.roomId} uid={uid.toString()} />;
+  return <AgoraRoom channel={roomId} uid={uid.toString()} />;
 }
