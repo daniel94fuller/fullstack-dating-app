@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   images: {
     remotePatterns: [
       {
@@ -32,10 +32,9 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // ✅ ADD THIS (fixes your build failure)
   eslint: {
     ignoreDuringBuilds: true,
   },
-};
+} satisfies NextConfig;
 
 export default nextConfig;
