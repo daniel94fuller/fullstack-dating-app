@@ -89,7 +89,7 @@ export default function AgoraRoom({
   const playAudio = (track: any) => {
     const el = document.createElement("audio");
     el.autoplay = true;
-    el.playsInline = true;
+    el.setAttribute("playsinline", "true");
     el.muted = false;
 
     el.srcObject = new MediaStream([track.getMediaStreamTrack()]);
