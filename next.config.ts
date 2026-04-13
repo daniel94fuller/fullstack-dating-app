@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+
+  // ✅ ADD THIS
+  allowedDevOrigins: ["kite-central-personally.ngrok-free.app"],
 };
 
 export default nextConfig;
