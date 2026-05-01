@@ -10,12 +10,13 @@ export default function LayoutClient({
 }) {
   const pathname = usePathname();
 
-  const hideNavbar = pathname === "/complete-profile";
+  // only hide on profile completion flow
+  const hideNavbar = pathname.startsWith("/complete-profile");
 
   return (
     <div className="h-full flex flex-col">
       {!hideNavbar && <Navbar />}
-      {children}
+      <main className="flex-1">{children}</main>
     </div>
   );
 }

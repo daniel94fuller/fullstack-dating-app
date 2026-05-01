@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 
@@ -16,7 +18,8 @@ export default function Logo() {
             absolute h-8 w-24
             rounded-full blur-md
             opacity-0 group-hover:opacity-40
-           
+            bg-blue-500/50   /* ✅ add color so glow actually shows */
+            transition-opacity duration-300
             z-0
           "
         />

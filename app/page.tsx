@@ -1,360 +1,248 @@
 "use client";
 
-import { useAuth } from "@/contexts/auth-context";
-import { useEffect, useState, useMemo } from "react";
-import UserAvatarBubble from "@/components/UserAvatarBubble";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { getGlobalActivity } from "@/lib/actions/activity";
-import ActivityCard from "@/components/ActivityCard";
-import ProfilePostCard from "@/components/ProfilePostCard";
-import {
-  getPotentialMatches,
-  getAllUsers,
-  likeUser,
-  skipUser,
-} from "@/lib/actions/matches";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-
-// ✅ ONLY addition
-type UserProfile = {
-  id: string;
-  username?: string;
-  full_name?: string;
-  avatar_url?: string;
-};
+import Link from "next/link";
+import { useGuestId } from "@/lib/hooks/useGuestId";
 
 export default function Home() {
-  const { user, loading } = useAuth();
   const supabase = createClient();
-  const router = useRouter();
+  const guestId = useGuestId();
 
-  const [discoverUsers, setDiscoverUsers] = useState<UserProfile[]>([]);
-  const [activity, setActivity] = useState<any[]>([]);
-  const [circleUsers, setCircleUsers] = useState<UserProfile[]>([]);
-  const [incomingLikes, setIncomingLikes] = useState<UserProfile[]>([]);
-  const [skippedUsers, setSkippedUsers] = useState<UserProfile[]>([]);
-  const [showSkipped, setShowSkipped] = useState(false);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [guestName, setGuestName] = useState("");
+  const [guestAvatar, setGuestAvatar] = useState<string | null>(null);
 
-  const [sentLikes, setSentLikes] = useState<UserProfile[]>([]);
-  const [showSentLikes, setShowSentLikes] = useState(false);
+  // =========================
+  // LOAD PLANS
+  // =========================
+  async function loadPlans() {
+    const { data } = await supabase
+      .from("dm_channels")
+      .select(
+        `
+        *,
+        dm_participants (
+          user_id,
+          guest_id,
+          name,
+          avatar_url
+        )
+      `,
+      )
+      .order("starts_at", { ascending: true });
 
-  const [matchedIds, setMatchedIds] = useState<Set<string>>(new Set());
-  const [circleCounts, setCircleCounts] = useState<Record<string, number>>({}); // ✅ NEW
-  const [ready, setReady] = useState(false);
+    setPlans(data || []);
+    setLoading(false);
+  }
 
-  // ===============================
-  // LOAD DATA
-  // ===============================
+  // =========================
+  // INITIAL LOAD
+  // =========================
   useEffect(() => {
-    async function loadAll() {
-      try {
-        const users = await getAllUsers();
+    async function load() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-        // ===============================
-        // 🔥 GLOBAL CIRCLE COUNTS
-        // ===============================
-        const { data: allMatches } = await supabase
-          .from("matches")
-          .select("user1_id, user2_id")
-          .eq("is_active", true);
+      setUser(user);
 
-        const counts: Record<string, number> = {};
+      const storedName = localStorage.getItem("guest_name");
+      const storedAvatar = localStorage.getItem("guest_avatar");
 
-        allMatches?.forEach((m) => {
-          counts[m.user1_id] = (counts[m.user1_id] || 0) + 1;
-          counts[m.user2_id] = (counts[m.user2_id] || 0) + 1;
-        });
+      if (storedName) setGuestName(storedName);
+      if (storedAvatar) setGuestAvatar(storedAvatar);
 
-        setCircleCounts(counts);
-
-        // ===============================
-        // GUEST MODE
-        // ===============================
-        if (!user) {
-          setDiscoverUsers(users.slice(0, 10));
-          setActivity([]);
-          setReady(true);
-          return;
-        }
-
-        // ===== ORIGINAL LOGIC =====
-
-        const { data: matchData } = await supabase
-          .from("matches")
-          .select("user1_id, user2_id")
-          .eq("is_active", true);
-
-        const matchIds = new Set<string>();
-        matchData?.forEach((m) => {
-          if (m.user1_id === user.id) matchIds.add(m.user2_id);
-          if (m.user2_id === user.id) matchIds.add(m.user1_id);
-        });
-
-        setMatchedIds(matchIds);
-
-        setCircleUsers(users.filter((u) => matchIds.has(u.id)));
-
-        const { data: likes } = await supabase
-          .from("likes")
-          .select("from_user_id")
-          .eq("to_user_id", user.id);
-
-        const likeIds = likes?.map((l) => l.from_user_id) || [];
-
-        const { data: likeUsers } = await supabase
-          .from("users")
-          .select("*")
-          .in("id", likeIds);
-
-        const filteredIncoming = (likeUsers || []).filter(
-          (u) => !matchIds.has(u.id),
-        );
-
-        setIncomingLikes(filteredIncoming);
-
-        const { data: sent } = await supabase
-          .from("likes")
-          .select("to_user_id")
-          .eq("from_user_id", user.id);
-
-        const sentIds = sent?.map((l) => l.to_user_id) || [];
-
-        const { data: sentUsers } = await supabase
-          .from("users")
-          .select("*")
-          .in("id", sentIds);
-
-        setSentLikes((sentUsers || []).filter((u) => !matchIds.has(u.id)));
-
-        const { data: skipped } = await supabase
-          .from("skipped")
-          .select("to_user_id")
-          .eq("from_user_id", user.id);
-
-        const skippedIds = skipped?.map((s) => s.to_user_id) || [];
-
-        const { data: skippedUsers } = await supabase
-          .from("users")
-          .select("*")
-          .in("id", skippedIds);
-
-        setSkippedUsers(skippedUsers || []);
-
-        const discover = await getPotentialMatches();
-
-        setDiscoverUsers(
-          discover.filter(
-            (u) =>
-              u.id !== user.id &&
-              !matchIds.has(u.id) &&
-              !filteredIncoming.find((l) => l.id === u.id) &&
-              !sentIds.includes(u.id) &&
-              !skippedIds.includes(u.id),
-          ),
-        );
-
-        const act = await getGlobalActivity();
-        setActivity(act);
-
-        setReady(true);
-      } catch (err) {
-        console.error(err);
-      }
+      await loadPlans();
     }
 
-    loadAll();
-  }, [user]);
+    load();
+  }, []);
 
-  // ===============================
-  // 🔥 SORT BY GLOBAL CIRCLE COUNT
-  // ===============================
-  const sortedDiscover = useMemo(() => {
-    return [...discoverUsers].sort((a, b) => {
-      const aScore = circleCounts[a.id] || 0;
-      const bScore = circleCounts[b.id] || 0;
+  // =========================
+  // REALTIME SYNC
+  // =========================
+  useEffect(() => {
+    const channel = supabase
+      .channel("plans-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "dm_participants",
+        },
+        () => loadPlans(),
+      )
+      .subscribe();
 
-      return bScore - aScore;
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // =========================
+  // 🔥 PROFILE SYNC (KEY FIX)
+  // =========================
+  useEffect(() => {
+    if (!guestId) return;
+
+    const avatar = user?.user_metadata?.avatar_url || guestAvatar || null;
+    const name = user?.user_metadata?.name || guestName || "Guest";
+
+    if (!name && !avatar) return;
+
+    console.log("🔄 syncing profile → participants");
+
+    supabase
+      .from("dm_participants")
+      .update({
+        name,
+        avatar_url: avatar,
+      })
+      .eq("guest_id", guestId);
+  }, [guestAvatar, guestName]);
+
+  // =========================
+  // JOIN PLAN
+  // =========================
+  async function joinPlan(planId: string) {
+    const name = user?.user_metadata?.name || guestName || "Guest";
+
+    const avatar = user?.user_metadata?.avatar_url || guestAvatar || null;
+
+    await supabase.from("dm_participants").upsert({
+      channel_id: planId,
+      user_id: user?.id || null,
+      guest_id: user ? null : guestId,
+      name,
+      avatar_url: avatar,
     });
-  }, [discoverUsers, circleCounts]);
 
-  // ===============================
-  // AUTH CHECK
-  // ===============================
-  function requireAuth() {
-    if (!user) {
-      router.push("/auth");
-      return false;
-    }
-    return true;
+    loadPlans();
   }
 
-  async function handleLike(id: string) {
-    if (!requireAuth()) return;
+  // =========================
+  // HELPERS
+  // =========================
+  function formatTime(date: string) {
+    if (!date) return "No time set";
 
-    const res = await likeUser(id);
-
-    setIncomingLikes((prev) => prev.filter((u) => u.id !== id));
-    setDiscoverUsers((prev) => prev.filter((u) => u.id !== id));
-
-    if (res?.isMatch) {
-      setMatchedIds((prev) => new Set(prev).add(id));
-    }
+    return new Date(date).toLocaleString([], {
+      weekday: "short",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
-  async function handlePass(id: string) {
-    if (!requireAuth()) return;
-
-    const passed = discoverUsers.find((u) => u.id === id);
-
-    if (passed) {
-      await skipUser(id);
-      setSkippedUsers((prev) => [passed, ...prev]);
-    }
-
-    setDiscoverUsers((prev) => prev.filter((u) => u.id !== id));
+  function isJoined(plan: any) {
+    return plan.dm_participants?.some(
+      (p: any) =>
+        (user && p.user_id === user.id) || (!user && p.guest_id === guestId),
+    );
   }
 
-  if (loading || !ready) {
+  function Avatar({ name, src }: any) {
+    if (src) {
+      return (
+        <img
+          src={src}
+          className="w-8 h-8 rounded-full object-cover border-2 border-white"
+        />
+      );
+    }
+
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin h-20 w-20 border-b-2 border-pink-500 rounded-full" />
+      <div className="w-8 h-8 rounded-full bg-gray-500 flex items-center justify-center text-white text-xs">
+        {name?.[0]}
       </div>
     );
   }
 
-  return (
-    <div className="w-full">
-      {/* YOUR CIRCLE */}
-      {user && (
-        <>
-          <div className="px-4 pt-4">
-            <h2 className="text-lg font-semibold mb-2">Your circle</h2>
-          </div>
+  // =========================
+  // LOADING
+  // =========================
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-16 w-16 border-b-2 border-white rounded-full" />
+      </div>
+    );
+  }
 
-          <div className="overflow-x-auto border-b border-white/5">
-            <div className="flex gap-4 px-4 py-3">
-              {circleUsers.map((u) => (
-                <Link
-                  key={u.id}
-                  href={`/profile/${u.username}`}
-                  className="flex flex-col items-center min-w-[70px]"
-                >
-                  <UserAvatarBubble src={u.avatar_url} size={80} />
-                  <p className="text-xs mt-1 text-center truncate w-full">
-                    {u.full_name}
-                  </p>
-                </Link>
+  // =========================
+  // UI
+  // =========================
+  return (
+    <div className="p-4 space-y-4">
+      {plans.map((plan) => {
+        const joined = isJoined(plan);
+
+        // main avatar (top-right)
+        const mainAvatar = plan.dm_participants?.find((p: any) => p.avatar_url);
+
+        return (
+          <div
+            key={plan.id}
+            className="bg-white rounded-xl p-4 text-black shadow"
+          >
+            {/* TOP */}
+            <div className="flex justify-between items-start">
+              <div>
+                <h2 className="text-xl font-bold">{plan.title || "Plan"}</h2>
+
+                <p className="text-sm text-gray-600">
+                  {formatTime(plan.starts_at)}
+                </p>
+              </div>
+
+              {mainAvatar ? (
+                <img
+                  src={mainAvatar.avatar_url}
+                  className="w-14 h-14 rounded-lg object-cover"
+                />
+              ) : (
+                <div className="w-14 h-14 bg-gray-200 rounded-lg" />
+              )}
+            </div>
+
+            {/* PARTICIPANTS */}
+            <div className="flex gap-2 mt-4 items-center">
+              {plan.dm_participants?.slice(0, 5).map((p: any, i: number) => (
+                <div key={i} className="-ml-2 first:ml-0">
+                  <Avatar name={p.name} src={p.avatar_url} />
+                </div>
               ))}
             </div>
+
+            {/* COUNT */}
+            <div className="text-sm text-gray-500 mt-2">
+              {plan.dm_participants?.length || 0} going
+            </div>
+
+            {/* ACTION */}
+            <div className="mt-4 flex gap-2">
+              {!joined ? (
+                <button
+                  onClick={() => joinPlan(plan.id)}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm"
+                >
+                  Join
+                </button>
+              ) : (
+                <Link
+                  href={`/dm/${plan.id}`}
+                  className="bg-black text-white px-4 py-2 rounded-full text-sm"
+                >
+                  Enter
+                </Link>
+              )}
+            </div>
           </div>
-        </>
-      )}
-
-      {/* INCOMING */}
-      {user && incomingLikes.length > 0 && (
-        <div className="px-4 mt-6">
-          <h2 className="text-lg font-semibold mb-3">
-            Interested in meeting you
-          </h2>
-
-          {incomingLikes.map((u) => (
-            <ProfilePostCard
-              key={u.id}
-              user={u}
-              onLike={handleLike}
-              onPass={() =>
-                setIncomingLikes((prev) => prev.filter((x) => x.id !== u.id))
-              }
-            />
-          ))}
-        </div>
-      )}
-
-      {/* ACTIVITY */}
-      {user && activity.length > 0 && (
-        <div className="px-4 mt-6">
-          <h2 className="text-lg font-semibold mb-3">Activity</h2>
-          {activity.slice(0, 3).map((item) => (
-            <ActivityCard key={item.id} item={item} />
-          ))}
-        </div>
-      )}
-
-      {/* DISCOVER */}
-      {sortedDiscover.length > 0 && (
-        <div className="px-4 mt-6">
-          <h2 className="text-lg font-semibold mb-4">
-            Meet people in San Francisco
-          </h2>
-
-          <div className="space-y-6">
-            {sortedDiscover.map((u) => (
-              <div
-                key={u.id}
-                onClick={() => {
-                  if (!user) router.push("/auth");
-                }}
-                className={!user ? "cursor-pointer" : ""}
-              >
-                <ProfilePostCard
-                  user={u}
-                  onLike={handleLike}
-                  onPass={handlePass}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* SHOW INTERESTED */}
-      {user && sentLikes.length > 0 && (
-        <div className="px-4 mt-6">
-          <button
-            onClick={() => setShowSentLikes((prev) => !prev)}
-            className="text-sm text-gray-500 underline mb-3"
-          >
-            {showSentLikes ? "Hide interested" : "Show interested"}
-          </button>
-
-          {showSentLikes &&
-            sentLikes.map((u) => (
-              <ProfilePostCard
-                key={u.id}
-                user={u}
-                onLike={() => {}}
-                onPass={() =>
-                  setSentLikes((prev) => prev.filter((x) => x.id !== u.id))
-                }
-              />
-            ))}
-        </div>
-      )}
-
-      {/* NOT INTERESTED */}
-      {user && skippedUsers.length > 0 && (
-        <div className="px-4 mt-6 pb-20">
-          <button
-            onClick={() => setShowSkipped((prev) => !prev)}
-            className="text-sm text-gray-500 underline mb-3"
-          >
-            {showSkipped ? "Hide not interested" : "Show not interested"}
-          </button>
-
-          {showSkipped &&
-            skippedUsers.map((u) => (
-              <ProfilePostCard
-                key={u.id}
-                user={u}
-                onLike={handleLike}
-                onPass={() =>
-                  setSkippedUsers((prev) => prev.filter((x) => x.id !== u.id))
-                }
-              />
-            ))}
-        </div>
-      )}
+        );
+      })}
     </div>
   );
 }
