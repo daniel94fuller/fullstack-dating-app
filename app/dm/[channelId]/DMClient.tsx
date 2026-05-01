@@ -83,7 +83,9 @@ export default function DMClient({ channelId }: { channelId: string }) {
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [channelId]);
 
   // =========================
