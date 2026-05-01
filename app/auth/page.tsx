@@ -1,6 +1,6 @@
-export const dynamic = "force-dynamic"; // 🔥 ADD THIS LINE
+"use client"; // ✅ MUST BE FIRST LINE
 
-("use client");
+export const dynamic = "force-dynamic"; // ✅ comes AFTER
 
 import Logo from "@/components/Logo";
 import { useAuth } from "@/contexts/auth-context";
