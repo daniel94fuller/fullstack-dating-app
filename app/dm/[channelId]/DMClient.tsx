@@ -41,28 +41,29 @@ export default function DMClient({ channelId }: { channelId: string }) {
     loadPlan();
   }, [channelId]);
 
-  // 🔥 AUTO JOIN (THIS FIXES DUPLICATES + "join again")
+  // AUTO JOIN
   useEffect(() => {
     if (!guestId || !channelId) return;
 
     const join = async () => {
-      await supabase
-        .from("dm_participants")
-        .insert({
+      await supabase.from("dm_participants").upsert(
+        {
           channel_id: channelId,
           guest_id: guestId,
           name: guestName || "Guest",
           avatar_url: guestAvatar || null,
-        })
-        .onConflict("channel_id,guest_id")
-        .ignore();
+        },
+        {
+          onConflict: "channel_id,guest_id",
+          ignoreDuplicates: true,
+        },
+      );
 
-      // refresh participants after joining
       loadPlan();
     };
 
     join();
-  }, [guestId, channelId]);
+  }, [guestId, channelId, guestName, guestAvatar]);
 
   // LOAD MESSAGES
   async function loadMessages() {
@@ -101,6 +102,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
             ) {
               return prev;
             }
+
             return [...prev, newMsg];
           });
         },
@@ -113,7 +115,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
   }, [channelId]);
 
   async function sendMessage() {
-    if (!input.trim()) return;
+    if (!input.trim() || !guestId) return;
 
     const clientId = crypto.randomUUID();
 
@@ -122,8 +124,8 @@ export default function DMClient({ channelId }: { channelId: string }) {
       client_id: clientId,
       content: input,
       guest_id: guestId,
-      sender_name: guestName,
-      avatar_url: guestAvatar,
+      sender_name: guestName || "Guest",
+      avatar_url: guestAvatar || null,
       channel_id: channelId,
     };
 
@@ -144,7 +146,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
 
     return (
       <div className="w-8 h-8 rounded-full bg-gray-500 text-white flex items-center justify-center text-xs">
-        {name?.[0]}
+        {name?.[0] || "G"}
       </div>
     );
   }
@@ -190,7 +192,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
 
           {/* MAP + QR */}
           <div className="flex gap-3">
-            {plan.location_name && (
+            {plan.location_name && plan.lat && plan.lng && (
               <button
                 onClick={() =>
                   window.open(
@@ -205,6 +207,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
                 <img
                   className="w-full h-full object-cover rounded-lg"
                   src={`https://maps.googleapis.com/maps/api/staticmap?center=${plan.lat},${plan.lng}&zoom=15&size=300x300&markers=color:red%7C${plan.lat},${plan.lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`}
+                  alt={plan.location_name}
                 />
               </button>
             )}
@@ -220,7 +223,11 @@ export default function DMClient({ channelId }: { channelId: string }) {
           {/* PARTICIPANTS */}
           <div className="flex gap-2">
             {plan.dm_participants?.map((p: any, i: number) => (
-              <Avatar key={i} name={p.name} src={p.avatar_url} />
+              <Avatar
+                key={`${p.guest_id}-${i}`}
+                name={p.name}
+                src={p.avatar_url}
+              />
             ))}
           </div>
 
@@ -244,7 +251,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
 
           return (
             <div
-              key={msg.id}
+              key={msg.id || msg.client_id}
               className={`flex ${mine ? "justify-end" : "justify-start"}`}
             >
               <div className="flex items-end gap-2">
@@ -275,6 +282,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           className="flex-1 border rounded-full px-4 py-2"
+          placeholder="Message..."
         />
         <button
           onClick={sendMessage}
