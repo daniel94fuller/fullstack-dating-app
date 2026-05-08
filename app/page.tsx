@@ -124,13 +124,13 @@ export default function Home() {
       return (
         <img
           src={src}
-          className="w-8 h-8 rounded-full object-cover border-2 border-white"
+          className="w-16 h-16 rounded-full object-cover border border-white/20"
         />
       );
     }
 
     return (
-      <div className="w-8 h-8 rounded-full bg-gray-500 text-white flex items-center justify-center text-xs">
+      <div className="w-16 h-16 rounded-full bg-white/10 text-white flex items-center justify-center text-lg border border-white/10">
         {name?.[0]}
       </div>
     );
@@ -167,56 +167,69 @@ export default function Home() {
           return (
             <div
               key={plan.id}
-              className="min-w-full snap-center bg-white rounded-xl p-4 text-black shadow"
+              className="min-w-full snap-center rounded-[28px] border border-white/10 bg-[#121418] px-5 py-6 text-white shadow-[0_20px_80px_rgba(0,0,0,0.35)]"
             >
               {/* TOP */}
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="text-xl font-bold">{plan.title || "Plan"}</h2>
+              <div>
+                <h2 className="text-4xl font-bold tracking-tight">
+                  {plan.title || "Plan"}
+                </h2>
 
-                  <p className="text-sm text-gray-600">
-                    {formatTime(plan.starts_at)}
-                  </p>
-                </div>
-
-                {mainAvatar ? (
-                  <img
-                    src={mainAvatar.avatar_url}
-                    className="w-14 h-14 rounded-lg object-cover"
-                  />
-                ) : (
-                  <div className="w-14 h-14 bg-gray-200 rounded-lg" />
-                )}
+                <p className="mt-3 text-lg text-gray-400">
+                  📅 {formatTime(plan.starts_at)}
+                </p>
               </div>
+
+              <div className="my-6 h-px bg-white/10" />
 
               {/* PARTICIPANTS */}
-              <div className="flex gap-2 mt-4 items-center">
-                {plan.dm_participants?.slice(0, 5).map((p: any, i: number) => (
-                  <Avatar key={i} name={p.name} src={p.avatar_url} />
-                ))}
-              </div>
+              <div className="grid grid-cols-3 items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <Avatar
+                    name={mainAvatar?.name || plan.dm_participants?.[0]?.name}
+                    src={
+                      mainAvatar?.avatar_url ||
+                      plan.dm_participants?.[0]?.avatar_url
+                    }
+                  />
 
-              <div className="text-sm text-gray-500 mt-2">
-                {plan.dm_participants?.length || 0} going
-              </div>
+                  <div>
+                    <p className="text-sm text-gray-400">Hosted by</p>
+                    <p className="text-xl font-semibold">
+                      {mainAvatar?.name ||
+                        plan.dm_participants?.[0]?.name ||
+                        "Guest"}
+                    </p>
+                  </div>
+                </div>
 
-              {/* ACTION */}
-              <div className="mt-4">
-                {!joined ? (
-                  <button
-                    onClick={() => joinPlan(plan.id)}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm"
-                  >
-                    Join
-                  </button>
-                ) : (
-                  <Link
-                    href={`/dm/${plan.slug || plan.id}`}
-                    className="bg-black text-white px-4 py-2 rounded-full text-sm"
-                  >
-                    Enter
-                  </Link>
-                )}
+                <div className="flex justify-center border-x border-white/10 px-4">
+                  <div className="text-center">
+                    <p className="text-3xl font-bold">
+                      {plan.dm_participants?.length || 0}
+                    </p>
+                    <p className="text-sm text-gray-400">going</p>
+                  </div>
+                </div>
+
+                {/* ACTION */}
+                <div className="flex justify-end">
+                  {!joined ? (
+                    <button
+                      onClick={() => joinPlan(plan.id)}
+                      className="rounded-full bg-black px-10 py-4 text-lg font-semibold text-white border border-white/10"
+                    >
+                      Join
+                    </button>
+                  ) : (
+                    <Link
+                      href={`/dm/${plan.slug || plan.id}`}
+                      className="rounded-full bg-black px-10 py-4 text-lg font-semibold text-white border border-white/10"
+                    >
+                      Enter
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -229,7 +242,7 @@ export default function Home() {
           <div
             key={i}
             className={`h-2 w-2 rounded-full transition ${
-              i === activeIndex ? "bg-black" : "bg-gray-400"
+              i === activeIndex ? "bg-white" : "bg-gray-600"
             }`}
           />
         ))}
