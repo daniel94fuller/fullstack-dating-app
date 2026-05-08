@@ -47,8 +47,18 @@ export default function Navbar() {
 
   useEffect(() => {
     const now = new Date();
-    setSelectedDate(now);
-    setSelectedHour((now.getHours() + 1) % 24);
+    const nextHour = now.getHours() + 1;
+
+    const defaultDate = new Date();
+
+    if (nextHour >= 24) {
+      defaultDate.setDate(defaultDate.getDate() + 1);
+      setSelectedDate(defaultDate);
+      setSelectedHour(0);
+    } else {
+      setSelectedDate(defaultDate);
+      setSelectedHour(nextHour);
+    }
   }, []);
 
   useEffect(() => {
@@ -71,6 +81,49 @@ export default function Navbar() {
     return () => clearTimeout(timeout);
   }, [location]);
 
+  function isSameDay(a: Date, b: Date) {
+    return a.toDateString() === b.toDateString();
+  }
+
+  function getEarliestHourForDate(date: Date) {
+    const now = new Date();
+
+    if (!isSameDay(date, now)) return 0;
+
+    const nextHour = now.getHours() + 1;
+
+    return nextHour >= 24 ? 24 : nextHour;
+  }
+
+  function getAvailableHours(date: Date | null) {
+    if (!date) return [];
+
+    const earliestHour = getEarliestHourForDate(date);
+
+    return Array.from(
+      { length: 24 - earliestHour },
+      (_, i) => i + earliestHour,
+    );
+  }
+
+  function formatDateButton(date: Date) {
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+    });
+  }
+
+  function formatHour(hour: number) {
+    const d = new Date();
+    d.setHours(hour, 0, 0, 0);
+
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
   function getNextDays(count = 14) {
     const days = [];
     const today = new Date();
@@ -78,10 +131,23 @@ export default function Navbar() {
     for (let i = 0; i < count; i++) {
       const d = new Date();
       d.setDate(today.getDate() + i);
+
+      if (i === 0 && getEarliestHourForDate(d) >= 24) continue;
+
       days.push(d);
     }
 
     return days;
+  }
+
+  function handleSelectDate(day: Date) {
+    setSelectedDate(day);
+
+    const availableHours = getAvailableHours(day);
+
+    if (!availableHours.includes(selectedHour ?? -1)) {
+      setSelectedHour(availableHours[0] ?? null);
+    }
   }
 
   async function fetchSuggestions(input: string) {
@@ -279,6 +345,8 @@ export default function Navbar() {
     router.push(`/dm/${data.id}`);
   }
 
+  const availableHours = getAvailableHours(selectedDate);
+
   return (
     <>
       <nav className="border-b border-white/10">
@@ -383,20 +451,20 @@ export default function Navbar() {
               {getNextDays().map((day, i) => (
                 <button
                   key={i}
-                  onClick={() => setSelectedDate(day)}
-                  className={`px-3 py-2 border rounded shrink-0 ${
+                  onClick={() => handleSelectDate(day)}
+                  className={`px-3 py-2 border rounded shrink-0 text-sm ${
                     selectedDate?.toDateString() === day.toDateString()
                       ? "bg-blue-500 text-white"
                       : ""
                   }`}
                 >
-                  {day.getDate()}
+                  {formatDateButton(day)}
                 </button>
               ))}
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {Array.from({ length: 24 }).map((_, hour) => (
+              {availableHours.map((hour) => (
                 <button
                   key={hour}
                   onClick={() => setSelectedHour(hour)}
@@ -404,7 +472,7 @@ export default function Navbar() {
                     selectedHour === hour ? "bg-blue-500 text-white" : ""
                   }`}
                 >
-                  {hour}:00
+                  {formatHour(hour)}
                 </button>
               ))}
             </div>
