@@ -45,20 +45,13 @@ export default function Navbar() {
     if (storedAvatar) setGuestAvatar(storedAvatar);
   }, []);
 
+  // ✅ default = next full hour
   useEffect(() => {
     const now = new Date();
-    const nextHour = now.getHours() + 1;
+    const nextHour = (now.getHours() + 1) % 24;
 
-    const defaultDate = new Date();
-
-    if (nextHour >= 24) {
-      defaultDate.setDate(defaultDate.getDate() + 1);
-      setSelectedDate(defaultDate);
-      setSelectedHour(0);
-    } else {
-      setSelectedDate(defaultDate);
-      setSelectedHour(nextHour);
-    }
+    setSelectedDate(now);
+    setSelectedHour(nextHour);
   }, []);
 
   useEffect(() => {
@@ -81,29 +74,17 @@ export default function Navbar() {
     return () => clearTimeout(timeout);
   }, [location]);
 
-  function isSameDay(a: Date, b: Date) {
-    return a.toDateString() === b.toDateString();
-  }
+  function getNextDays(count = 14) {
+    const days = [];
+    const today = new Date();
 
-  function getEarliestHourForDate(date: Date) {
-    const now = new Date();
+    for (let i = 0; i < count; i++) {
+      const d = new Date();
+      d.setDate(today.getDate() + i);
+      days.push(d);
+    }
 
-    if (!isSameDay(date, now)) return 0;
-
-    const nextHour = now.getHours() + 1;
-
-    return nextHour >= 24 ? 24 : nextHour;
-  }
-
-  function getAvailableHours(date: Date | null) {
-    if (!date) return [];
-
-    const earliestHour = getEarliestHourForDate(date);
-
-    return Array.from(
-      { length: 24 - earliestHour },
-      (_, i) => i + earliestHour,
-    );
+    return days;
   }
 
   function formatDateButton(date: Date) {
@@ -124,30 +105,8 @@ export default function Navbar() {
     });
   }
 
-  function getNextDays(count = 14) {
-    const days = [];
-    const today = new Date();
-
-    for (let i = 0; i < count; i++) {
-      const d = new Date();
-      d.setDate(today.getDate() + i);
-
-      if (i === 0 && getEarliestHourForDate(d) >= 24) continue;
-
-      days.push(d);
-    }
-
-    return days;
-  }
-
   function handleSelectDate(day: Date) {
     setSelectedDate(day);
-
-    const availableHours = getAvailableHours(day);
-
-    if (!availableHours.includes(selectedHour ?? -1)) {
-      setSelectedHour(availableHours[0] ?? null);
-    }
   }
 
   async function fetchSuggestions(input: string) {
@@ -345,7 +304,8 @@ export default function Navbar() {
     router.push(`/dm/${data.id}`);
   }
 
-  const availableHours = getAvailableHours(selectedDate);
+  // ✅ ALL 24 HOURS
+  const allHours = Array.from({ length: 24 }, (_, i) => i);
 
   return (
     <>
@@ -376,25 +336,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {showProfile && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
-          <div className="bg-white text-black p-6 rounded-xl space-y-4 w-full max-w-sm">
-            <input
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-              placeholder="Your name"
-              className="border p-2 w-full"
-            />
-
-            <input type="file" onChange={handleImage} />
-
-            {uploading && <p>Uploading...</p>}
-
-            <button onClick={saveProfile}>Save</button>
-          </div>
-        </div>
-      )}
-
       {showCreate && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
           <div className="bg-white text-black p-6 rounded-xl w-full max-w-sm space-y-4">
@@ -406,46 +347,6 @@ export default function Navbar() {
               placeholder="What are you doing?"
               className="border p-2 w-full"
             />
-
-            <div className="relative">
-              <input
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  setCoords(null);
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                placeholder="Where?"
-                autoComplete="off"
-                inputMode="text"
-                className="border p-2 w-full"
-              />
-
-              {showSuggestions && suggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 z-[9999] bg-white border rounded-b shadow max-h-56 overflow-y-auto">
-                  {suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion.place_id}
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => selectSuggestion(suggestion)}
-                      className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-                    >
-                      {suggestion.description}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {coords && MAP_KEY && (
-              <img
-                className="w-full h-32 object-cover rounded"
-                src={`https://maps.googleapis.com/maps/api/staticmap?center=${coords.lat},${coords.lng}&zoom=15&size=600x300&markers=color:red%7C${coords.lat},${coords.lng}&key=${MAP_KEY}`}
-                alt="Location"
-              />
-            )}
 
             <div className="flex gap-2 overflow-x-auto pb-1">
               {getNextDays().map((day, i) => (
@@ -464,7 +365,7 @@ export default function Navbar() {
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-1">
-              {availableHours.map((hour) => (
+              {allHours.map((hour) => (
                 <button
                   key={hour}
                   onClick={() => setSelectedHour(hour)}
@@ -477,16 +378,7 @@ export default function Navbar() {
               ))}
             </div>
 
-            <div className="flex justify-between items-center">
-              <button onClick={() => setShowCreate(false)}>Cancel</button>
-
-              <button
-                onClick={createPlan}
-                className="bg-blue-500 px-4 py-2 text-white rounded"
-              >
-                Create
-              </button>
-            </div>
+            <button onClick={createPlan}>Create</button>
           </div>
         </div>
       )}
