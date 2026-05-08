@@ -51,6 +51,10 @@ export default function Navbar() {
 
     if (storedName) setGuestName(storedName);
     if (storedAvatar) setGuestAvatar(storedAvatar);
+
+    if (!storedName || !storedAvatar) {
+      setShowProfile(true);
+    }
   }, []);
 
   useEffect(() => {

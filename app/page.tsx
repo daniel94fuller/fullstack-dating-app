@@ -211,7 +211,7 @@ export default function Home() {
                   </button>
                 ) : (
                   <Link
-                    href={`/dm/${plan.id}`}
+                    href={`/dm/${plan.slug || plan.id}`}
                     className="bg-black text-white px-4 py-2 rounded-full text-sm"
                   >
                     Enter
