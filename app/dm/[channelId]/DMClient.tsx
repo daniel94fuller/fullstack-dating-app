@@ -15,18 +15,22 @@ export default function DMClient({ channelId }: { channelId: string }) {
   const [guestName, setGuestName] = useState("");
   const [guestAvatar, setGuestAvatar] = useState<string | null>(null);
 
+  const [showInvite, setShowInvite] = useState(false);
+
   const guestId = useGuestId();
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  // LOAD PROFILE
   useEffect(() => {
     setGuestName(localStorage.getItem("guest_name") || "Guest");
     setGuestAvatar(localStorage.getItem("guest_avatar"));
   }, []);
 
+  // LOAD PLAN
   async function loadPlan() {
     const { data } = await supabase
       .from("dm_channels")
-      .select(`*, dm_participants(name, avatar_url)`)
+      .select(`*, dm_participants(name, avatar_url, guest_id)`)
       .eq("id", channelId)
       .single();
 
@@ -37,6 +41,30 @@ export default function DMClient({ channelId }: { channelId: string }) {
     loadPlan();
   }, [channelId]);
 
+  // 🔥 AUTO JOIN (THIS FIXES DUPLICATES + "join again")
+  useEffect(() => {
+    if (!guestId || !channelId) return;
+
+    const join = async () => {
+      await supabase
+        .from("dm_participants")
+        .insert({
+          channel_id: channelId,
+          guest_id: guestId,
+          name: guestName || "Guest",
+          avatar_url: guestAvatar || null,
+        })
+        .onConflict("channel_id,guest_id")
+        .ignore();
+
+      // refresh participants after joining
+      loadPlan();
+    };
+
+    join();
+  }, [guestId, channelId]);
+
+  // LOAD MESSAGES
   async function loadMessages() {
     const { data } = await supabase
       .from("dm_messages")
@@ -51,9 +79,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
     loadMessages();
   }, [channelId]);
 
-  // =========================
-  // 🔥 REALTIME (DEDUPED)
-  // =========================
+  // REALTIME
   useEffect(() => {
     const channel = supabase
       .channel(`room-${channelId}`)
@@ -69,14 +95,12 @@ export default function DMClient({ channelId }: { channelId: string }) {
           const newMsg = payload.new;
 
           setMessages((prev) => {
-            // 🔥 dedupe by client_id
             if (
               newMsg.client_id &&
               prev.some((m) => m.client_id === newMsg.client_id)
             ) {
               return prev;
             }
-
             return [...prev, newMsg];
           });
         },
@@ -88,9 +112,6 @@ export default function DMClient({ channelId }: { channelId: string }) {
     };
   }, [channelId]);
 
-  // =========================
-  // SEND MESSAGE (FIXED)
-  // =========================
   async function sendMessage() {
     if (!input.trim()) return;
 
@@ -106,23 +127,10 @@ export default function DMClient({ channelId }: { channelId: string }) {
       channel_id: channelId,
     };
 
-    // 🔥 optimistic
     setMessages((prev) => [...prev, tempMessage]);
-
     setInput("");
 
-    const { error } = await supabase.from("dm_messages").insert({
-      channel_id: channelId,
-      content: tempMessage.content,
-      guest_id: guestId,
-      sender_name: guestName,
-      avatar_url: guestAvatar,
-      client_id: clientId,
-    });
-
-    if (error) {
-      console.error("❌ INSERT FAILED:", error);
-    }
+    await supabase.from("dm_messages").insert(tempMessage);
   }
 
   function isMe(msg: any) {
@@ -150,21 +158,82 @@ export default function DMClient({ channelId }: { channelId: string }) {
       ? `${window.location.origin}/dm/${channelId}`
       : "";
 
+  async function copyLink() {
+    await navigator.clipboard.writeText(qrUrl);
+    alert("Link copied");
+  }
+
   return (
-    <div className="h-screen flex flex-col">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* HEADER */}
       {plan && (
-        <div className="p-4 border-b">
-          <div className="flex justify-between">
-            <h1 className="font-bold">{plan.title}</h1>
-            <QRCode value={qrUrl} size={50} />
+        <div className="p-3 border-b space-y-3">
+          <h1 className="font-bold text-lg">{plan.title}</h1>
+
+          {plan.starts_at && (
+            <p className="text-sm text-gray-400">
+              {(() => {
+                const d = new Date(Number(plan.starts_at));
+                const date = d.toLocaleDateString([], {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                });
+                const time = d.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                });
+                return `${date} · ${time}`;
+              })()}
+            </p>
+          )}
+
+          {/* MAP + QR */}
+          <div className="flex gap-3">
+            {plan.location_name && (
+              <button
+                onClick={() =>
+                  window.open(
+                    `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      plan.location_name,
+                    )}`,
+                    "_blank",
+                  )
+                }
+                className="w-28 h-28"
+              >
+                <img
+                  className="w-full h-full object-cover rounded-lg"
+                  src={`https://maps.googleapis.com/maps/api/staticmap?center=${plan.lat},${plan.lng}&zoom=15&size=300x300&markers=color:red%7C${plan.lat},${plan.lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`}
+                />
+              </button>
+            )}
+
+            <button
+              onClick={() => setShowInvite(true)}
+              className="w-28 h-28 bg-white p-2 rounded-lg flex items-center justify-center"
+            >
+              <QRCode value={qrUrl} size={90} />
+            </button>
           </div>
 
-          <div className="flex gap-2 mt-2">
+          {/* PARTICIPANTS */}
+          <div className="flex gap-2">
             {plan.dm_participants?.map((p: any, i: number) => (
               <Avatar key={i} name={p.name} src={p.avatar_url} />
             ))}
           </div>
+
+          <button
+            onClick={() =>
+              document
+                .querySelector("input")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+            className="text-sm text-blue-500"
+          >
+            Jump to messages ↓
+          </button>
         </div>
       )}
 
@@ -214,6 +283,32 @@ export default function DMClient({ channelId }: { channelId: string }) {
           Send
         </button>
       </div>
+
+      {/* INVITE MODAL */}
+      {showInvite && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+          onClick={() => setShowInvite(false)}
+        >
+          <div
+            className="bg-white p-6 rounded-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <QRCode value={qrUrl} size={200} />
+
+            <button
+              onClick={copyLink}
+              className="w-full bg-blue-500 text-white py-2 rounded"
+            >
+              Copy Link
+            </button>
+
+            <p className="text-center text-sm text-gray-500">
+              Scan or share to invite
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

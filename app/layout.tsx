@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import LayoutClient from "@/components/LayoutClient";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,8 +31,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
       >
-        {/* ❌ REMOVE AUTH */}
         <LayoutClient>{children}</LayoutClient>
+
+        {/* 🔥 GOOGLE MAPS SCRIPT (FIXED) */}
+        <Script
+          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}&libraries=places&loading=async`}
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
