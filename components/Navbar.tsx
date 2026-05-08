@@ -129,7 +129,7 @@ export default function Navbar() {
 
   // CREATE PLAN
   async function createPlan() {
-    if (!title) return;
+    if (!title || !guestId) return;
 
     let startsAt = null;
 
@@ -151,13 +151,13 @@ export default function Navbar() {
       .select()
       .single();
 
-    if (error) {
+    if (error || !data) {
       console.error("Create plan error:", error);
       return;
     }
 
-    // ✅ FIXED: proper conflict-safe insert
-    await supabase.from("dm_participants").insert(
+    // ✅ FIX: use upsert (NOT insert + onConflict)
+    await supabase.from("dm_participants").upsert(
       {
         channel_id: data.id,
         guest_id: guestId,
@@ -191,6 +191,7 @@ export default function Navbar() {
                 <img
                   src={guestAvatar}
                   className="w-10 h-10 rounded-full object-cover"
+                  alt="Profile"
                 />
               ) : (
                 "👤"
@@ -252,10 +253,11 @@ export default function Navbar() {
               <img
                 className="w-full h-32 object-cover rounded"
                 src={`https://maps.googleapis.com/maps/api/staticmap?center=${coords.lat},${coords.lng}&zoom=15&size=600x300&markers=color:red%7C${coords.lat},${coords.lng}&key=${MAP_KEY}`}
+                alt="Location"
               />
             )}
 
-            {/* DAY */}
+            {/* DATE */}
             <div className="flex gap-2 overflow-x-auto">
               {getNextDays().map((day, i) => (
                 <button
