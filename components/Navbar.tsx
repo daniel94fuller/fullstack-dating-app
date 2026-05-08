@@ -11,6 +11,14 @@ type Suggestion = {
   place_id: string;
 };
 
+function slugify(text: string) {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-");
+}
+
 export default function Navbar() {
   const router = useRouter();
   const supabase = createClient();
@@ -283,6 +291,8 @@ export default function Navbar() {
   async function createPlan() {
     if (!title || !guestId) return;
 
+    const slug = `${slugify(title)}-${Date.now()}`;
+
     let startsAt = null;
 
     if (selectedDate && selectedHour !== null) {
@@ -309,6 +319,7 @@ export default function Navbar() {
       .from("dm_channels")
       .insert({
         title,
+        slug,
         location_name: finalLocation,
         lat: finalLat,
         lng: finalLng,
@@ -342,7 +353,7 @@ export default function Navbar() {
     setSuggestions([]);
     setShowSuggestions(false);
 
-    router.push(`/dm/${data.id}`);
+    router.push(`/dm/${slug}`);
   }
 
   const availableHours = Array.from({ length: 24 }, (_, i) => i);

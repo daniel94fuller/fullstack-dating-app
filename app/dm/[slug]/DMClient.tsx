@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useGuestId } from "@/lib/hooks/useGuestId";
 import QRCode from "react-qr-code";
 
-export default function DMClient({ channelId }: { channelId: string }) {
+export default function DMClient({ slug }: { slug: string }) {
   const supabase = createClient();
 
   const [messages, setMessages] = useState<any[]>([]);
@@ -17,6 +17,8 @@ export default function DMClient({ channelId }: { channelId: string }) {
 
   const [showInvite, setShowInvite] = useState(false);
 
+  const [channelId, setChannelId] = useState<string | null>(null);
+
   const guestId = useGuestId();
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -26,8 +28,29 @@ export default function DMClient({ channelId }: { channelId: string }) {
     setGuestAvatar(localStorage.getItem("guest_avatar"));
   }, []);
 
+  // 🔥 RESOLVE SLUG → CHANNEL ID
+  useEffect(() => {
+    if (!slug) return;
+
+    const resolve = async () => {
+      const { data } = await supabase
+        .from("dm_channels")
+        .select("id")
+        .eq("slug", slug)
+        .single();
+
+      if (data?.id) {
+        setChannelId(data.id);
+      }
+    };
+
+    resolve();
+  }, [slug]);
+
   // LOAD PLAN
   async function loadPlan() {
+    if (!channelId) return;
+
     const { data } = await supabase
       .from("dm_channels")
       .select(`*, dm_participants(name, avatar_url, guest_id)`)
@@ -67,6 +90,8 @@ export default function DMClient({ channelId }: { channelId: string }) {
 
   // LOAD MESSAGES
   async function loadMessages() {
+    if (!channelId) return;
+
     const { data } = await supabase
       .from("dm_messages")
       .select("*")
@@ -82,6 +107,8 @@ export default function DMClient({ channelId }: { channelId: string }) {
 
   // REALTIME
   useEffect(() => {
+    if (!channelId) return;
+
     const channel = supabase
       .channel(`room-${channelId}`)
       .on(
@@ -115,7 +142,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
   }, [channelId]);
 
   async function sendMessage() {
-    if (!input.trim() || !guestId) return;
+    if (!input.trim() || !guestId || !channelId) return;
 
     const clientId = crypto.randomUUID();
 
@@ -156,9 +183,7 @@ export default function DMClient({ channelId }: { channelId: string }) {
   }, [messages]);
 
   const qrUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/dm/${channelId}`
-      : "";
+    typeof window !== "undefined" ? `${window.location.origin}/dm/${slug}` : "";
 
   async function copyLink() {
     await navigator.clipboard.writeText(qrUrl);
@@ -190,7 +215,6 @@ export default function DMClient({ channelId }: { channelId: string }) {
             </p>
           )}
 
-          {/* MAP + QR */}
           <div className="flex gap-3">
             {plan.location_name && plan.lat && plan.lng && (
               <button
@@ -220,7 +244,6 @@ export default function DMClient({ channelId }: { channelId: string }) {
             </button>
           </div>
 
-          {/* PARTICIPANTS */}
           <div className="flex gap-2">
             {plan.dm_participants?.map((p: any, i: number) => (
               <Avatar
@@ -230,17 +253,6 @@ export default function DMClient({ channelId }: { channelId: string }) {
               />
             ))}
           </div>
-
-          <button
-            onClick={() =>
-              document
-                .querySelector("input")
-                ?.scrollIntoView({ behavior: "smooth" })
-            }
-            className="text-sm text-blue-500"
-          >
-            Jump to messages ↓
-          </button>
         </div>
       )}
 
