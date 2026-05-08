@@ -6,6 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { useState, useEffect } from "react";
 import { useGuestId } from "@/lib/hooks/useGuestId";
 
+type Suggestion = {
+  description: string;
+  place_id: string;
+};
+
 export default function Navbar() {
   const router = useRouter();
   const supabase = createClient();
@@ -20,6 +25,8 @@ export default function Navbar() {
 
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
@@ -44,6 +51,26 @@ export default function Navbar() {
     setSelectedHour((now.getHours() + 1) % 24);
   }, []);
 
+  useEffect(() => {
+    if (!showCreate) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [showCreate]);
+
+  useEffect(() => {
+    if (!location.trim() || location.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      fetchSuggestions(location);
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [location]);
+
   function getNextDays(count = 14) {
     const days = [];
     const today = new Date();
@@ -55,6 +82,71 @@ export default function Navbar() {
     }
 
     return days;
+  }
+
+  async function fetchSuggestions(input: string) {
+    const google = (window as any).google;
+
+    if (!google?.maps?.places) return;
+
+    const service = new google.maps.places.AutocompleteService();
+
+    service.getPlacePredictions(
+      {
+        input,
+        types: ["establishment", "geocode"],
+      },
+      (predictions: any[], status: string) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK) {
+          setSuggestions([]);
+          return;
+        }
+
+        setSuggestions(
+          predictions.map((p) => ({
+            description: p.description,
+            place_id: p.place_id,
+          })),
+        );
+      },
+    );
+  }
+
+  async function selectSuggestion(suggestion: Suggestion) {
+    const google = (window as any).google;
+    if (!google?.maps?.places) return;
+
+    const container = document.createElement("div");
+    const service = new google.maps.places.PlacesService(container);
+
+    service.getDetails(
+      {
+        placeId: suggestion.place_id,
+        fields: ["formatted_address", "geometry", "name"],
+      },
+      (place: any, status: string) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !place) {
+          setLocation(suggestion.description);
+          setSuggestions([]);
+          setShowSuggestions(false);
+          return;
+        }
+
+        const lat = place.geometry?.location?.lat();
+        const lng = place.geometry?.location?.lng();
+
+        setLocation(
+          place.formatted_address || place.name || suggestion.description,
+        );
+
+        if (lat && lng) {
+          setCoords({ lat, lng });
+        }
+
+        setSuggestions([]);
+        setShowSuggestions(false);
+      },
+    );
   }
 
   async function geocodeLocation() {
@@ -72,12 +164,9 @@ export default function Navbar() {
 
       if (!result) return null;
 
-      const lat = result.geometry.location.lat;
-      const lng = result.geometry.location.lng;
-
       return {
-        lat,
-        lng,
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
         formattedAddress: result.formatted_address || location,
       };
     } catch (error) {
@@ -140,14 +229,13 @@ export default function Navbar() {
     let finalLat = coords?.lat || null;
     let finalLng = coords?.lng || null;
 
-    if (location.trim()) {
+    if (location.trim() && (!finalLat || !finalLng)) {
       const geo = await geocodeLocation();
 
       if (geo) {
         finalLocation = geo.formattedAddress;
         finalLat = geo.lat;
         finalLng = geo.lng;
-        setCoords({ lat: geo.lat, lng: geo.lng });
       }
     }
 
@@ -185,6 +273,8 @@ export default function Navbar() {
     setTitle("");
     setLocation("");
     setCoords(null);
+    setSuggestions([]);
+    setShowSuggestions(false);
 
     router.push(`/dm/${data.id}`);
   }
@@ -249,17 +339,37 @@ export default function Navbar() {
               className="border p-2 w-full"
             />
 
-            <input
-              value={location}
-              onChange={(e) => {
-                setLocation(e.target.value);
-                setCoords(null);
-              }}
-              placeholder="Where?"
-              autoComplete="off"
-              inputMode="text"
-              className="border p-2 w-full"
-            />
+            <div className="relative">
+              <input
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  setCoords(null);
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                placeholder="Where?"
+                autoComplete="off"
+                inputMode="text"
+                className="border p-2 w-full"
+              />
+
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-[9999] bg-white border rounded-b shadow max-h-56 overflow-y-auto">
+                  {suggestions.map((suggestion) => (
+                    <button
+                      key={suggestion.place_id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectSuggestion(suggestion)}
+                      className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                    >
+                      {suggestion.description}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {coords && MAP_KEY && (
               <img
