@@ -3,13 +3,12 @@
 import Logo from "./Logo";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useGuestId } from "@/lib/hooks/useGuestId";
 
 export default function Navbar() {
   const router = useRouter();
   const supabase = createClient();
-
   const guestId = useGuestId();
 
   const [showProfile, setShowProfile] = useState(false);
@@ -28,11 +27,9 @@ export default function Navbar() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     null,
   );
-  const locationRef = useRef<HTMLInputElement>(null);
 
   const MAP_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
-  // LOAD PROFILE
   useEffect(() => {
     const storedName = localStorage.getItem("guest_name");
     const storedAvatar = localStorage.getItem("guest_avatar");
@@ -41,40 +38,11 @@ export default function Navbar() {
     if (storedAvatar) setGuestAvatar(storedAvatar);
   }, []);
 
-  // DEFAULT TIME
   useEffect(() => {
     const now = new Date();
     setSelectedDate(now);
     setSelectedHour((now.getHours() + 1) % 24);
   }, []);
-
-  // GOOGLE AUTOCOMPLETE
-  useEffect(() => {
-    if (!showCreate) return;
-
-    const interval = setInterval(() => {
-      if (locationRef.current && (window as any).google) {
-        clearInterval(interval);
-
-        const autocomplete = new (
-          window as any
-        ).google.maps.places.Autocomplete(locationRef.current);
-
-        autocomplete.addListener("place_changed", () => {
-          const place = autocomplete.getPlace();
-          if (!place.geometry) return;
-
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-
-          setLocation(place.formatted_address || place.name || "");
-          setCoords({ lat, lng });
-        });
-      }
-    }, 200);
-
-    return () => clearInterval(interval);
-  }, [showCreate]);
 
   function getNextDays(count = 14) {
     const days = [];
@@ -87,6 +55,35 @@ export default function Navbar() {
     }
 
     return days;
+  }
+
+  async function geocodeLocation() {
+    if (!location.trim() || !MAP_KEY) return null;
+
+    try {
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
+          location,
+        )}&key=${MAP_KEY}`,
+      );
+
+      const data = await res.json();
+      const result = data.results?.[0];
+
+      if (!result) return null;
+
+      const lat = result.geometry.location.lat;
+      const lng = result.geometry.location.lng;
+
+      return {
+        lat,
+        lng,
+        formattedAddress: result.formatted_address || location,
+      };
+    } catch (error) {
+      console.error("Geocode error:", error);
+      return null;
+    }
   }
 
   async function handleImage(e: any) {
@@ -120,6 +117,7 @@ export default function Navbar() {
     if (!guestName) return;
 
     localStorage.setItem("guest_name", guestName);
+
     if (guestAvatar) {
       localStorage.setItem("guest_avatar", guestAvatar);
     }
@@ -127,7 +125,6 @@ export default function Navbar() {
     setShowProfile(false);
   }
 
-  // CREATE PLAN
   async function createPlan() {
     if (!title || !guestId) return;
 
@@ -139,13 +136,28 @@ export default function Navbar() {
       startsAt = d.getTime();
     }
 
+    let finalLocation = location || null;
+    let finalLat = coords?.lat || null;
+    let finalLng = coords?.lng || null;
+
+    if (location.trim()) {
+      const geo = await geocodeLocation();
+
+      if (geo) {
+        finalLocation = geo.formattedAddress;
+        finalLat = geo.lat;
+        finalLng = geo.lng;
+        setCoords({ lat: geo.lat, lng: geo.lng });
+      }
+    }
+
     const { data, error } = await supabase
       .from("dm_channels")
       .insert({
         title,
-        location_name: location || null,
-        lat: coords?.lat || null,
-        lng: coords?.lng || null,
+        location_name: finalLocation,
+        lat: finalLat,
+        lng: finalLng,
         starts_at: startsAt,
       })
       .select()
@@ -156,7 +168,6 @@ export default function Navbar() {
       return;
     }
 
-    // ✅ FIX: use upsert (NOT insert + onConflict)
     await supabase.from("dm_participants").upsert(
       {
         channel_id: data.id,
@@ -180,7 +191,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* NAVBAR */}
       <nav className="border-b border-white/10">
         <div className="flex justify-between items-center h-16 px-4">
           <Logo />
@@ -208,10 +218,9 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* PROFILE MODAL */}
       {showProfile && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-white text-black p-6 rounded-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
+          <div className="bg-white text-black p-6 rounded-xl space-y-4 w-full max-w-sm">
             <input
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
@@ -228,10 +237,9 @@ export default function Navbar() {
         </div>
       )}
 
-      {/* CREATE PLAN MODAL */}
       {showCreate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-white text-black p-6 rounded-xl w-[320px] space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4">
+          <div className="bg-white text-black p-6 rounded-xl w-full max-w-sm space-y-4">
             <h2 className="font-semibold">Create Plan</h2>
 
             <input
@@ -242,10 +250,14 @@ export default function Navbar() {
             />
 
             <input
-              ref={locationRef}
               value={location}
-              onChange={(e) => setLocation(e.target.value)}
+              onChange={(e) => {
+                setLocation(e.target.value);
+                setCoords(null);
+              }}
               placeholder="Where?"
+              autoComplete="off"
+              inputMode="text"
               className="border p-2 w-full"
             />
 
@@ -257,13 +269,12 @@ export default function Navbar() {
               />
             )}
 
-            {/* DATE */}
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {getNextDays().map((day, i) => (
                 <button
                   key={i}
                   onClick={() => setSelectedDate(day)}
-                  className={`px-3 py-2 border rounded ${
+                  className={`px-3 py-2 border rounded shrink-0 ${
                     selectedDate?.toDateString() === day.toDateString()
                       ? "bg-blue-500 text-white"
                       : ""
@@ -274,13 +285,12 @@ export default function Navbar() {
               ))}
             </div>
 
-            {/* TIME */}
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {Array.from({ length: 24 }).map((_, hour) => (
                 <button
                   key={hour}
                   onClick={() => setSelectedHour(hour)}
-                  className={`px-3 py-2 border rounded ${
+                  className={`px-3 py-2 border rounded shrink-0 ${
                     selectedHour === hour ? "bg-blue-500 text-white" : ""
                   }`}
                 >
@@ -289,8 +299,9 @@ export default function Navbar() {
               ))}
             </div>
 
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <button onClick={() => setShowCreate(false)}>Cancel</button>
+
               <button
                 onClick={createPlan}
                 className="bg-blue-500 px-4 py-2 text-white rounded"
