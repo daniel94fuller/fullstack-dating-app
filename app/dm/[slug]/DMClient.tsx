@@ -249,28 +249,56 @@ export default function DMClient({ slug }: { slug: string }) {
               <h1 className="text-4xl font-bold leading-tight">{plan.title}</h1>
 
               {plan.starts_at && (
-                <div className="mt-3 text-zinc-300 space-y-1">
-                  <p>
-                    {(() => {
-                      const d = new Date(Number(plan.starts_at));
+                <div className="mt-5 space-y-3">
+                  <div className="inline-flex items-center gap-4 rounded-3xl bg-white text-black px-5 py-4 shadow-lg">
+                    <div className="text-center leading-none">
+                      <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+                        {new Date(Number(plan.starts_at)).toLocaleDateString(
+                          [],
+                          {
+                            month: "short",
+                          },
+                        )}
+                      </div>
 
-                      const date = d.toLocaleDateString([], {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      });
+                      <div className="text-4xl font-black tracking-tight">
+                        {new Date(Number(plan.starts_at)).toLocaleDateString(
+                          [],
+                          {
+                            day: "numeric",
+                          },
+                        )}
+                      </div>
+                    </div>
 
-                      const time = d.toLocaleTimeString([], {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      });
+                    <div className="h-12 w-px bg-zinc-300" />
 
-                      return `${date} • ${time}`;
-                    })()}
-                  </p>
+                    <div>
+                      <div className="text-xl font-extrabold">
+                        {new Date(Number(plan.starts_at)).toLocaleDateString(
+                          [],
+                          {
+                            weekday: "long",
+                          },
+                        )}
+                      </div>
+
+                      <div className="text-lg font-semibold text-zinc-700">
+                        {new Date(Number(plan.starts_at)).toLocaleTimeString(
+                          [],
+                          {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          },
+                        )}
+                      </div>
+                    </div>
+                  </div>
 
                   {plan.location_name && (
-                    <p className="text-zinc-400">{plan.location_name}</p>
+                    <p className="text-base font-medium text-zinc-300">
+                      {plan.location_name}
+                    </p>
                   )}
                 </div>
               )}
