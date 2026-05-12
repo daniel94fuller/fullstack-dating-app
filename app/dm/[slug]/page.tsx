@@ -69,7 +69,7 @@ export async function generateMetadata({ params }: PageProps) {
       : "Join this plan on Popcircle.";
 
   const pageUrl = `${siteUrl}/dm/${slug}`;
-  const imageUrl = `${siteUrl}/dm/${slug}/opengraph-image`;
+  const imageUrl = `${siteUrl}/api/og/${slug}/image.png`;
 
   return {
     metadataBase: new URL(siteUrl),
