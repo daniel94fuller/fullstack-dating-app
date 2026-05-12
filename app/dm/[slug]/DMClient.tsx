@@ -330,9 +330,53 @@ export default function DMClient({ slug }: { slug: string }) {
   const qrUrl =
     typeof window !== "undefined" ? `${window.location.origin}/dm/${slug}` : "";
 
-  async function copyLink() {
-    await navigator.clipboard.writeText(qrUrl);
-    alert("Link copied");
+  async function sharePlan() {
+    const shareTitle = plan?.title || "Plan";
+
+    const dateText = plan?.starts_at
+      ? new Date(Number(plan.starts_at)).toLocaleString("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        })
+      : "";
+
+    const locationText = plan?.location_name ? `📍 ${plan.location_name}` : "";
+
+    const message = [
+      `Join my plan: ${shareTitle}`,
+      dateText ? `🗓 ${dateText}` : "",
+      locationText,
+      qrUrl,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${shareTitle} on Popcircle`,
+          text: message,
+          url: qrUrl,
+        });
+
+        return;
+      }
+
+      await navigator.clipboard.writeText(message);
+      alert("Plan copied");
+    } catch (error) {
+      console.error("Share failed:", error);
+
+      try {
+        await navigator.clipboard.writeText(message);
+        alert("Plan copied");
+      } catch {
+        alert("Could not copy plan");
+      }
+    }
   }
 
   function addToCalendar() {
@@ -659,10 +703,10 @@ export default function DMClient({ slug }: { slug: string }) {
             </div>
 
             <button
-              onClick={copyLink}
+              onClick={sharePlan}
               className="w-full bg-blue-600 text-white py-3 rounded-2xl font-semibold"
             >
-              Copy Invite Link
+              Share Plan
             </button>
 
             <p className="text-center text-sm text-zinc-400">
