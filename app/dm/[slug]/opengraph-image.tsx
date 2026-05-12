@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "edge";
 
@@ -16,10 +16,48 @@ type Props = {
   }>;
 };
 
-async function getPlan(slug: string) {
-  const supabase = await createClient();
+function getSupabase() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-  const { data } = await supabase
+  return createClient(supabaseUrl, supabaseAnonKey);
+}
+
+function formatDate(startsAt: string | number | null | undefined) {
+  if (!startsAt) {
+    return {
+      date: "Date TBD",
+      time: "",
+    };
+  }
+
+  const d = new Date(Number(startsAt));
+
+  if (Number.isNaN(d.getTime())) {
+    return {
+      date: "Date TBD",
+      time: "",
+    };
+  }
+
+  return {
+    date: d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+    }),
+    time: d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
+}
+
+export default async function Image({ params }: Props) {
+  const { slug } = await params;
+  const supabase = getSupabase();
+
+  const { data: plan } = await supabase
     .from("dm_channels")
     .select(
       `
@@ -35,45 +73,15 @@ async function getPlan(slug: string) {
     .eq("slug", slug)
     .single();
 
-  return data;
-}
-
-function formatPlanDate(startsAt: string | number | null) {
-  if (!startsAt) {
-    return {
-      date: "Date TBD",
-      time: "",
-    };
-  }
-
-  const date = new Date(Number(startsAt));
-
-  return {
-    date: date.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-    }),
-    time: date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    }),
-  };
-}
-
-export default async function Image({ params }: Props) {
-  const { slug } = await params;
-  const plan = await getPlan(slug);
-
   const title = plan?.title || "Plan";
-  const locationName = plan?.location_name || "Location TBD";
+  const location = plan?.location_name || "Location TBD";
   const participants = plan?.dm_participants || [];
   const goingCount = participants.length;
 
-  const { date, time } = formatPlanDate(plan?.starts_at || null);
+  const { date, time } = formatDate(plan?.starts_at);
 
   const mapUrl =
-    plan?.lat && plan?.lng
+    plan?.lat && plan?.lng && process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
       ? `https://maps.googleapis.com/maps/api/staticmap?center=${plan.lat},${plan.lng}&zoom=14&size=1200x630&scale=2&markers=color:red%7C${plan.lat},${plan.lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY}`
       : null;
 
@@ -87,21 +95,32 @@ export default async function Image({ params }: Props) {
         display: "flex",
         position: "relative",
         overflow: "hidden",
-        background: "#080808",
+        background: "#09090b",
         color: "white",
-        fontFamily: "Arial",
+        fontFamily: "Arial, Helvetica, sans-serif",
       }}
     >
-      {mapUrl && (
+      {mapUrl ? (
         <img
           src={mapUrl}
+          width="1200"
+          height="630"
           style={{
             position: "absolute",
             inset: 0,
             width: "1200px",
             height: "630px",
             objectFit: "cover",
-            opacity: 0.55,
+            opacity: 0.5,
+          }}
+        />
+      ) : (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(135deg, #09090b 0%, #18181b 45%, #3f0715 100%)",
           }}
         />
       )}
@@ -111,7 +130,7 @@ export default async function Image({ params }: Props) {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(90deg, rgba(0,0,0,0.96) 0%, rgba(0,0,0,0.82) 34%, rgba(0,0,0,0.45) 62%, rgba(0,0,0,0.25) 100%)",
+            "linear-gradient(90deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.88) 38%, rgba(0,0,0,0.45) 70%, rgba(0,0,0,0.2) 100%)",
         }}
       />
 
@@ -120,7 +139,7 @@ export default async function Image({ params }: Props) {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(0deg, rgba(70,0,20,0.86) 0%, rgba(70,0,20,0.42) 20%, rgba(0,0,0,0) 52%)",
+            "linear-gradient(0deg, rgba(70,0,20,0.92) 0%, rgba(70,0,20,0.45) 22%, rgba(0,0,0,0) 55%)",
         }}
       />
 
@@ -130,13 +149,13 @@ export default async function Image({ params }: Props) {
           zIndex: 2,
           width: "100%",
           height: "100%",
-          padding: "56px 64px",
+          padding: "54px 64px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
         }}
       >
-        {/* Top branding */}
+        {/* BRAND */}
         <div
           style={{
             display: "flex",
@@ -149,13 +168,13 @@ export default async function Image({ params }: Props) {
               width: "72px",
               height: "72px",
               borderRadius: "999px",
-              background: "#ff0000",
+              background: "#ef0000",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: "32px",
-              fontWeight: 800,
-              letterSpacing: "-2px",
+              fontWeight: 900,
+              letterSpacing: "-3px",
             }}
           >
             pop
@@ -164,7 +183,7 @@ export default async function Image({ params }: Props) {
           <div
             style={{
               fontSize: "34px",
-              fontWeight: 800,
+              fontWeight: 900,
               letterSpacing: "-1px",
             }}
           >
@@ -172,21 +191,21 @@ export default async function Image({ params }: Props) {
           </div>
         </div>
 
-        {/* Main content */}
+        {/* MAIN */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "28px",
-            maxWidth: "650px",
+            gap: "30px",
+            maxWidth: "700px",
           }}
         >
           <div
             style={{
-              fontSize: title.length > 18 ? "76px" : "94px",
+              fontSize: title.length > 18 ? "74px" : "96px",
               fontWeight: 900,
               letterSpacing: "-5px",
-              lineHeight: 0.95,
+              lineHeight: 0.94,
             }}
           >
             {title}
@@ -196,7 +215,7 @@ export default async function Image({ params }: Props) {
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "22px",
+              gap: "24px",
             }}
           >
             <div
@@ -211,14 +230,15 @@ export default async function Image({ params }: Props) {
                   width: "72px",
                   height: "72px",
                   borderRadius: "18px",
-                  background: "rgba(255,255,255,0.12)",
+                  background: "rgba(255,255,255,0.14)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "34px",
+                  fontSize: "32px",
+                  fontWeight: 900,
                 }}
               >
-                📅
+                17
               </div>
 
               <div
@@ -230,7 +250,7 @@ export default async function Image({ params }: Props) {
                 <div
                   style={{
                     fontSize: "34px",
-                    fontWeight: 800,
+                    fontWeight: 900,
                   }}
                 >
                   {date}
@@ -259,14 +279,15 @@ export default async function Image({ params }: Props) {
                   width: "72px",
                   height: "72px",
                   borderRadius: "18px",
-                  background: "rgba(99,102,241,0.8)",
+                  background: "rgba(79,70,229,0.95)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "34px",
+                  fontSize: "38px",
+                  fontWeight: 900,
                 }}
               >
-                📍
+                •
               </div>
 
               <div
@@ -278,10 +299,10 @@ export default async function Image({ params }: Props) {
                 <div
                   style={{
                     fontSize: "34px",
-                    fontWeight: 800,
+                    fontWeight: 900,
                   }}
                 >
-                  {locationName}
+                  {location}
                 </div>
 
                 <div
@@ -297,21 +318,21 @@ export default async function Image({ params }: Props) {
           </div>
         </div>
 
-        {/* Bottom people row */}
+        {/* FOOTER */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             borderTop: "1px solid rgba(255,255,255,0.16)",
-            paddingTop: "28px",
+            paddingTop: "26px",
           }}
         >
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "16px",
+              gap: "18px",
             }}
           >
             <div
@@ -328,19 +349,21 @@ export default async function Image({ params }: Props) {
                     height: "64px",
                     borderRadius: "999px",
                     overflow: "hidden",
-                    background: "#333",
+                    background: "#27272a",
                     border: "3px solid rgba(255,255,255,0.9)",
                     marginLeft: index === 0 ? "0px" : "-14px",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: "28px",
-                    fontWeight: 800,
+                    fontWeight: 900,
                   }}
                 >
                   {p.avatar_url ? (
                     <img
                       src={p.avatar_url}
+                      width="64"
+                      height="64"
                       style={{
                         width: "64px",
                         height: "64px",
@@ -352,12 +375,31 @@ export default async function Image({ params }: Props) {
                   )}
                 </div>
               ))}
+
+              {participants.length === 0 && (
+                <div
+                  style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "999px",
+                    background: "#27272a",
+                    border: "3px solid rgba(255,255,255,0.9)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "28px",
+                    fontWeight: 900,
+                  }}
+                >
+                  P
+                </div>
+              )}
             </div>
 
             <div
               style={{
                 fontSize: "32px",
-                fontWeight: 800,
+                fontWeight: 900,
                 color: "#22c55e",
               }}
             >
@@ -381,7 +423,8 @@ export default async function Image({ params }: Props) {
       </div>
     </div>,
     {
-      ...size,
+      width: 1200,
+      height: 630,
     },
   );
 }
