@@ -7,6 +7,8 @@ type PageProps = {
   }>;
 };
 
+const siteUrl = "https://www.popcircle.com";
+
 async function getPlan(slug: string) {
   const supabase = await createClient();
 
@@ -58,41 +60,59 @@ export async function generateMetadata({ params }: PageProps) {
 
   const descriptionParts = [
     planDate && planTime ? `${planDate} at ${planTime}` : null,
-    plan?.location_name ? `at ${plan.location_name}` : null,
+    plan?.location_name ? plan.location_name : null,
   ].filter(Boolean);
 
   const description =
     descriptionParts.length > 0
-      ? `Join ${planTitle} ${descriptionParts.join(" ")}.`
+      ? `Join ${planTitle}: ${descriptionParts.join(" • ")}`
       : "Join this plan on Popcircle.";
 
-  const pageUrl = `https://www.popcircle.com/dm/${slug}`;
-  const imageUrl = `/dm/${slug}/opengraph-image`;
+  const pageUrl = `${siteUrl}/dm/${slug}`;
+  const imageUrl = `${siteUrl}/dm/${slug}/opengraph-image`;
 
   return {
+    metadataBase: new URL(siteUrl),
     title,
     description,
-    metadataBase: new URL("https://www.popcircle.com"),
+
     openGraph: {
       title,
       description,
       url: pageUrl,
       siteName: "Popcircle",
+      type: "website",
       images: [
         {
           url: imageUrl,
+          secureUrl: imageUrl,
           width: 1200,
           height: 630,
-          alt: title,
+          alt: `${planTitle} plan preview`,
+          type: "image/png",
         },
       ],
-      type: "website",
     },
+
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [imageUrl],
+      images: [
+        {
+          url: imageUrl,
+          alt: `${planTitle} plan preview`,
+        },
+      ],
+    },
+
+    other: {
+      "og:image": imageUrl,
+      "og:image:secure_url": imageUrl,
+      "og:image:type": "image/png",
+      "og:image:width": "1200",
+      "og:image:height": "630",
+      "twitter:image": imageUrl,
     },
   };
 }
