@@ -15,9 +15,15 @@ export default function DMClient({ slug }: { slug: string }) {
   const [guestName, setGuestName] = useState("");
   const [guestAvatar, setGuestAvatar] = useState<string | null>(null);
 
-  const [showInvite, setShowInvite] = useState(false);
+  const [profileNameInput, setProfileNameInput] = useState("");
+  const [profileAvatarPreview, setProfileAvatarPreview] = useState<
+    string | null
+  >(null);
+  const [profileAvatarFile, setProfileAvatarFile] = useState<File | null>(null);
+  const [showProfileSetup, setShowProfileSetup] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
 
-  // ✅ NEW
+  const [showInvite, setShowInvite] = useState(false);
   const [chatExpanded, setChatExpanded] = useState(false);
 
   const [channelId, setChannelId] = useState<string | null>(null);
@@ -25,10 +31,25 @@ export default function DMClient({ slug }: { slug: string }) {
   const guestId = useGuestId();
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const profileComplete = Boolean(guestName.trim()) && Boolean(guestAvatar);
+
   // LOAD PROFILE
   useEffect(() => {
-    setGuestName(localStorage.getItem("guest_name") || "Guest");
-    setGuestAvatar(localStorage.getItem("guest_avatar"));
+    const savedName = localStorage.getItem("guest_name") || "";
+    const savedAvatar = localStorage.getItem("guest_avatar");
+
+    const validSavedAvatar =
+      savedAvatar && !savedAvatar.startsWith("data:") ? savedAvatar : null;
+
+    setGuestName(savedName);
+    setGuestAvatar(validSavedAvatar);
+
+    setProfileNameInput(savedName);
+    setProfileAvatarPreview(validSavedAvatar);
+
+    if (!savedName.trim() || !validSavedAvatar) {
+      setShowProfileSetup(true);
+    }
   }, []);
 
   // RESOLVE SLUG
@@ -67,21 +88,20 @@ export default function DMClient({ slug }: { slug: string }) {
     loadPlan();
   }, [channelId]);
 
-  // AUTO JOIN
+  // AUTO JOIN ONLY AFTER PROFILE IS COMPLETE
   useEffect(() => {
-    if (!guestId || !channelId) return;
+    if (!guestId || !channelId || !profileComplete) return;
 
     const join = async () => {
       await supabase.from("dm_participants").upsert(
         {
           channel_id: channelId,
           guest_id: guestId,
-          name: guestName || "Guest",
-          avatar_url: guestAvatar || null,
+          name: guestName.trim(),
+          avatar_url: guestAvatar,
         },
         {
           onConflict: "channel_id,guest_id",
-          ignoreDuplicates: true,
         } as any,
       );
 
@@ -89,7 +109,7 @@ export default function DMClient({ slug }: { slug: string }) {
     };
 
     join();
-  }, [guestId, channelId, guestName, guestAvatar]);
+  }, [guestId, channelId, guestName, guestAvatar, profileComplete]);
 
   // LOAD MESSAGES
   async function loadMessages() {
@@ -144,7 +164,123 @@ export default function DMClient({ slug }: { slug: string }) {
     };
   }, [channelId]);
 
+  async function uploadGuestAvatar(file: File) {
+    if (!guestId) {
+      throw new Error("Missing guest ID");
+    }
+
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const fileName = `${crypto.randomUUID()}.${fileExt}`;
+    const filePath = `${guestId}/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("guest-avatars")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabase.storage
+      .from("guest-avatars")
+      .getPublicUrl(filePath);
+
+    return data.publicUrl;
+  }
+
+  async function saveGuestProfile() {
+    const cleanName = profileNameInput.trim();
+
+    if (!cleanName) {
+      alert("Please add your name.");
+      return;
+    }
+
+    if (!profileAvatarFile && !guestAvatar) {
+      alert("Please add a photo.");
+      return;
+    }
+
+    if (!guestId) {
+      alert("Guest profile is still loading. Try again.");
+      return;
+    }
+
+    setSavingProfile(true);
+
+    try {
+      let avatarUrl = guestAvatar;
+
+      if (profileAvatarFile) {
+        avatarUrl = await uploadGuestAvatar(profileAvatarFile);
+      }
+
+      if (!avatarUrl) {
+        alert("Please add a photo.");
+        return;
+      }
+
+      localStorage.setItem("guest_name", cleanName);
+      localStorage.setItem("guest_avatar", avatarUrl);
+
+      setGuestName(cleanName);
+      setGuestAvatar(avatarUrl);
+      setProfileAvatarPreview(avatarUrl);
+      setProfileAvatarFile(null);
+      setShowProfileSetup(false);
+
+      if (channelId) {
+        await supabase.from("dm_participants").upsert(
+          {
+            channel_id: channelId,
+            guest_id: guestId,
+            name: cleanName,
+            avatar_url: avatarUrl,
+          },
+          {
+            onConflict: "channel_id,guest_id",
+          } as any,
+        );
+
+        loadPlan();
+      }
+    } catch (error: any) {
+      console.error("Failed to save profile:", error);
+      alert(error?.message || "Could not save profile. Please try again.");
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("Please choose an image file.");
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      alert("Please choose an image smaller than 5MB.");
+      return;
+    }
+
+    setProfileAvatarFile(file);
+    setProfileAvatarPreview(URL.createObjectURL(file));
+  }
+
   async function sendMessage() {
+    if (!profileComplete) {
+      setShowProfileSetup(true);
+      return;
+    }
+
     if (!input.trim() || !guestId || !channelId) return;
 
     const clientId = crypto.randomUUID();
@@ -154,8 +290,8 @@ export default function DMClient({ slug }: { slug: string }) {
       client_id: clientId,
       content: input,
       guest_id: guestId,
-      sender_name: guestName || "Guest",
-      avatar_url: guestAvatar || null,
+      sender_name: guestName.trim(),
+      avatar_url: guestAvatar,
       channel_id: channelId,
     };
 
@@ -175,6 +311,7 @@ export default function DMClient({ slug }: { slug: string }) {
         <img
           src={src}
           className="w-10 h-10 rounded-full object-cover border border-white/20"
+          alt={name || "Guest avatar"}
         />
       );
     }
@@ -198,7 +335,6 @@ export default function DMClient({ slug }: { slug: string }) {
     alert("Link copied");
   }
 
-  // ✅ ADD TO CALENDAR
   function addToCalendar() {
     if (!plan?.starts_at) return;
 
@@ -218,7 +354,6 @@ export default function DMClient({ slug }: { slug: string }) {
     window.open(url, "_blank");
   }
 
-  // ✅ ADD TO HOME SCREEN
   async function addToHomeScreen() {
     alert(
       "On mobile:\n\nTap browser menu → 'Add to Home Screen' to save this plan.",
@@ -338,7 +473,14 @@ export default function DMClient({ slug }: { slug: string }) {
               </button>
 
               <button
-                onClick={() => setChatExpanded(!chatExpanded)}
+                onClick={() => {
+                  if (!profileComplete) {
+                    setShowProfileSetup(true);
+                    return;
+                  }
+
+                  setChatExpanded(!chatExpanded);
+                }}
                 className="bg-blue-600 py-3 rounded-2xl font-semibold col-span-2"
               >
                 {chatExpanded ? "Hide Chat" : "Open Chat"}
@@ -436,6 +578,70 @@ export default function DMClient({ slug }: { slug: string }) {
             </div>
           </div>
         </>
+      )}
+
+      {/* REQUIRED PROFILE SETUP MODAL */}
+      {showProfileSetup && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center z-[60] px-4">
+          <div className="w-full max-w-sm bg-zinc-950 border border-white/10 rounded-3xl p-6 space-y-5 shadow-2xl">
+            <div>
+              <h2 className="text-2xl font-bold">Join this plan</h2>
+              <p className="text-sm text-zinc-400 mt-1">
+                Add your name and photo so people know who is going.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-3">
+              <label className="cursor-pointer">
+                {profileAvatarPreview ? (
+                  <img
+                    src={profileAvatarPreview}
+                    className="w-24 h-24 rounded-full object-cover border-2 border-white"
+                    alt="Profile preview"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-zinc-400 text-sm">
+                    Add Photo
+                  </div>
+                )}
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
+              </label>
+
+              <p className="text-xs text-zinc-500">Tap to upload a photo</p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-zinc-300">
+                Your name
+              </label>
+
+              <input
+                value={profileNameInput}
+                onChange={(e) => setProfileNameInput(e.target.value)}
+                className="mt-2 w-full bg-zinc-900 border border-white/10 rounded-2xl px-4 py-3 outline-none text-white"
+                placeholder="Enter your name"
+              />
+            </div>
+
+            <button
+              onClick={saveGuestProfile}
+              disabled={
+                savingProfile ||
+                !profileNameInput.trim() ||
+                (!profileAvatarFile && !guestAvatar)
+              }
+              className="w-full bg-blue-600 disabled:bg-zinc-700 disabled:text-zinc-400 text-white py-3 rounded-2xl font-semibold"
+            >
+              {savingProfile ? "Joining..." : "Join Plan"}
+            </button>
+          </div>
+        </div>
       )}
 
       {/* INVITE MODAL */}
