@@ -96,11 +96,12 @@ export async function GET(
         display: "flex",
         position: "relative",
         overflow: "hidden",
-        background: "#010101",
+        background: "#050505",
         color: "white",
         fontFamily: "Arial",
       }}
     >
+      {/* MAP BACKGROUND */}
       {mapUrl ? (
         <img
           src={mapUrl}
@@ -112,7 +113,7 @@ export async function GET(
             width: "1200px",
             height: "630px",
             objectFit: "cover",
-            opacity: 0.13,
+            opacity: 0.56,
           }}
         />
       ) : (
@@ -122,55 +123,34 @@ export async function GET(
             position: "absolute",
             inset: 0,
             background:
-              "linear-gradient(135deg, #010101 0%, #050505 45%, #120007 100%)",
+              "linear-gradient(135deg, #050505 0%, #151515 46%, #2a0010 100%)",
           }}
         />
       )}
 
-      <div
-        style={{
-          display: "flex",
-          position: "absolute",
-          inset: 0,
-          background: "rgba(0,0,0,0.58)",
-        }}
-      />
-
+      {/* LEFT DARK READABILITY OVERLAY */}
       <div
         style={{
           display: "flex",
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(90deg, rgba(0,0,0,0.998) 0%, rgba(0,0,0,0.994) 30%, rgba(0,0,0,0.965) 52%, rgba(0,0,0,0.84) 74%, rgba(0,0,0,0.62) 100%)",
+            "linear-gradient(90deg, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.92) 34%, rgba(0,0,0,0.64) 62%, rgba(0,0,0,0.28) 100%)",
         }}
       />
 
+      {/* SOFT BOTTOM TINT */}
       <div
         style={{
           display: "flex",
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(0deg, rgba(10,0,5,0.98) 0%, rgba(0,0,0,0.72) 38%, rgba(0,0,0,0.12) 100%)",
+            "linear-gradient(0deg, rgba(40,0,15,0.88) 0%, rgba(0,0,0,0.18) 42%, rgba(0,0,0,0) 100%)",
         }}
       />
 
-      <div
-        style={{
-          display: "flex",
-          position: "absolute",
-          left: "44px",
-          top: "34px",
-          width: "710px",
-          height: "548px",
-          borderRadius: "30px",
-          background: "rgba(0,0,0,0.44)",
-          border: "1px solid rgba(255,255,255,0.06)",
-          boxShadow: "0 24px 80px rgba(0,0,0,0.56)",
-        }}
-      />
-
+      {/* MAIN CONTENT */}
       <div
         style={{
           display: "flex",
@@ -178,39 +158,82 @@ export async function GET(
           zIndex: 2,
           width: "100%",
           height: "100%",
-          padding: "50px 60px",
+          padding: "52px 64px 38px 64px",
           flexDirection: "column",
           justifyContent: "space-between",
         }}
       >
+        {/* TOP */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: "26px",
-            maxWidth: "690px",
+            gap: "30px",
+            maxWidth: "730px",
           }}
         >
+          {/* BRAND */}
           <div
             style={{
               display: "flex",
-              fontSize: title.length > 18 ? "68px" : "88px",
+              alignItems: "center",
+              gap: "14px",
+            }}
+          >
+            <div
+              style={{
+                width: "70px",
+                height: "70px",
+                borderRadius: "999px",
+                background: "#ff0000",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "31px",
+                fontWeight: 900,
+                letterSpacing: "-3px",
+                boxShadow: "0 16px 45px rgba(0,0,0,0.45)",
+              }}
+            >
+              pop
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                fontSize: "34px",
+                fontWeight: 900,
+                letterSpacing: "-1px",
+                textShadow: "0 10px 30px rgba(0,0,0,0.8)",
+              }}
+            >
+              circle
+            </div>
+          </div>
+
+          {/* TITLE */}
+          <div
+            style={{
+              display: "flex",
+              fontSize: title.length > 18 ? "74px" : "98px",
               fontWeight: 900,
-              letterSpacing: "-4px",
-              lineHeight: 0.92,
-              textShadow: "0 10px 34px rgba(0,0,0,0.98)",
+              letterSpacing: "-5px",
+              lineHeight: 0.94,
+              textShadow: "0 14px 40px rgba(0,0,0,0.95)",
             }}
           >
             {title}
           </div>
 
+          {/* DETAILS */}
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: "18px",
+              gap: "22px",
             }}
           >
+            {/* DATE */}
             <div
               style={{
                 display: "flex",
@@ -220,28 +243,34 @@ export async function GET(
             >
               <div
                 style={{
-                  width: "70px",
-                  height: "70px",
+                  width: "76px",
+                  height: "76px",
                   borderRadius: "20px",
-                  background: "rgba(255,255,255,0.09)",
-                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "rgba(255,255,255,0.16)",
+                  border: "1px solid rgba(255,255,255,0.24)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "30px",
+                  fontSize: "32px",
                   fontWeight: 900,
+                  boxShadow: "0 14px 40px rgba(0,0,0,0.5)",
                 }}
               >
                 {day}
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
                 <div
                   style={{
                     display: "flex",
-                    fontSize: "34px",
+                    fontSize: "35px",
                     fontWeight: 900,
-                    lineHeight: 1.08,
+                    lineHeight: 1.05,
                   }}
                 >
                   {date}
@@ -250,9 +279,9 @@ export async function GET(
                 <div
                   style={{
                     display: "flex",
-                    fontSize: "32px",
-                    color: "rgba(255,255,255,0.86)",
-                    lineHeight: 1.12,
+                    fontSize: "33px",
+                    color: "rgba(255,255,255,0.84)",
+                    lineHeight: 1.15,
                   }}
                 >
                   {time}
@@ -260,6 +289,7 @@ export async function GET(
               </div>
             </div>
 
+            {/* LOCATION */}
             <div
               style={{
                 display: "flex",
@@ -269,17 +299,17 @@ export async function GET(
             >
               <div
                 style={{
-                  width: "70px",
-                  height: "70px",
+                  width: "76px",
+                  height: "76px",
                   borderRadius: "20px",
-                  background: "rgba(79,70,229,0.95)",
-                  border: "1px solid rgba(255,255,255,0.14)",
+                  background: "linear-gradient(135deg, #6d5dfc, #4f46e5)",
+                  border: "1px solid rgba(255,255,255,0.22)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "42px",
+                  fontSize: "44px",
                   fontWeight: 900,
-                  flexShrink: 0,
+                  boxShadow: "0 14px 40px rgba(79,70,229,0.35)",
                 }}
               >
                 •
@@ -289,13 +319,13 @@ export async function GET(
                 style={{
                   display: "flex",
                   flexDirection: "column",
-                  maxWidth: "560px",
+                  maxWidth: "640px",
                 }}
               >
                 <div
                   style={{
                     display: "flex",
-                    fontSize: "32px",
+                    fontSize: location.length > 38 ? "29px" : "33px",
                     fontWeight: 900,
                     lineHeight: 1.08,
                   }}
@@ -307,8 +337,8 @@ export async function GET(
                   style={{
                     display: "flex",
                     fontSize: "25px",
-                    color: "rgba(255,255,255,0.64)",
-                    lineHeight: 1.18,
+                    color: "rgba(255,255,255,0.68)",
+                    lineHeight: 1.2,
                   }}
                 >
                   {planUrl}
@@ -318,42 +348,28 @@ export async function GET(
           </div>
         </div>
 
+        {/* FOOTER */}
         <div
           style={{
             display: "flex",
-            alignItems: "flex-end",
+            alignItems: "center",
             justifyContent: "space-between",
-            width: "100%",
-            borderTop: "1px solid rgba(255,255,255,0.12)",
-            paddingTop: "18px",
+            borderTop: "1px solid rgba(255,255,255,0.16)",
+            paddingTop: "20px",
           }}
         >
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-              maxWidth: "720px",
+              alignItems: "center",
+              gap: "24px",
             }}
           >
             <div
               style={{
                 display: "flex",
-                fontSize: "31px",
-                fontWeight: 900,
-                color: "#22c55e",
-                lineHeight: 1,
-              }}
-            >
-              {goingCount} going
-            </div>
-
-            <div
-              style={{
-                display: "flex",
                 alignItems: "flex-start",
-                gap: "16px",
-                height: "104px",
+                gap: "14px",
               }}
             >
               {shownParticipants.length > 0 ? (
@@ -365,13 +381,13 @@ export async function GET(
                       flexDirection: "column",
                       alignItems: "center",
                       gap: "7px",
-                      width: "88px",
+                      width: "78px",
                     }}
                   >
                     <div
                       style={{
-                        width: "74px",
-                        height: "74px",
+                        width: "66px",
+                        height: "66px",
                         borderRadius: "999px",
                         overflow: "hidden",
                         background: "#27272a",
@@ -379,19 +395,19 @@ export async function GET(
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "28px",
+                        fontSize: "26px",
                         fontWeight: 900,
-                        boxShadow: "0 10px 28px rgba(0,0,0,0.5)",
+                        boxShadow: "0 10px 26px rgba(0,0,0,0.58)",
                       }}
                     >
                       {p.avatar_url ? (
                         <img
                           src={p.avatar_url}
-                          width="74"
-                          height="74"
+                          width="66"
+                          height="66"
                           style={{
-                            width: "74px",
-                            height: "74px",
+                            width: "66px",
+                            height: "66px",
                             objectFit: "cover",
                           }}
                         />
@@ -405,11 +421,12 @@ export async function GET(
                         display: "flex",
                         justifyContent: "center",
                         textAlign: "center",
-                        fontSize: "17px",
+                        fontSize: "16px",
                         fontWeight: 700,
                         lineHeight: 1,
-                        color: "rgba(255,255,255,0.9)",
-                        width: "88px",
+                        color: "rgba(255,255,255,0.92)",
+                        width: "78px",
+                        textShadow: "0 8px 20px rgba(0,0,0,0.8)",
                       }}
                     >
                       {getShortName(p.name)}
@@ -421,25 +438,38 @@ export async function GET(
                   style={{
                     display: "flex",
                     fontSize: "24px",
-                    color: "rgba(255,255,255,0.75)",
+                    color: "rgba(255,255,255,0.74)",
                   }}
                 >
                   Be first to join
                 </div>
               )}
             </div>
+
+            <div
+              style={{
+                display: "flex",
+                fontSize: "32px",
+                fontWeight: 900,
+                color: "#22c55e",
+                marginTop: "-12px",
+                textShadow: "0 8px 24px rgba(0,0,0,0.8)",
+              }}
+            >
+              {goingCount} going
+            </div>
           </div>
 
           <div
             style={{
               display: "flex",
+              alignItems: "center",
               background: "linear-gradient(135deg, #2563eb, #4f46e5)",
               padding: "22px 42px",
               borderRadius: "30px",
               fontSize: "32px",
               fontWeight: 900,
-              boxShadow: "0 20px 50px rgba(37,99,235,0.45)",
-              marginBottom: "22px",
+              boxShadow: "0 22px 55px rgba(37,99,235,0.55)",
             }}
           >
             Open Chat
@@ -451,7 +481,7 @@ export async function GET(
       width: 1200,
       height: 630,
       headers: {
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": "public, max-age=60, s-maxage=60",
         "Content-Type": "image/png",
       },
     },

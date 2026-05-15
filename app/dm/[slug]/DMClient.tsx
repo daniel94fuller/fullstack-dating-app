@@ -330,7 +330,12 @@ export default function DMClient({ slug }: { slug: string }) {
   const qrUrl =
     typeof window !== "undefined" ? `${window.location.origin}/dm/${slug}` : "";
 
-  async function sharePlan() {
+  const planImageUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/og/${slug}/image`
+      : "";
+
+  function getShareMessage() {
     const shareTitle = plan?.title || "Plan";
 
     const dateText = plan?.starts_at
@@ -345,21 +350,64 @@ export default function DMClient({ slug }: { slug: string }) {
 
     const locationText = plan?.location_name ? `📍 ${plan.location_name}` : "";
 
-    const message = [
+    return [
       `Join my plan: ${shareTitle}`,
       dateText ? `🗓 ${dateText}` : "",
       locationText,
+      "",
       qrUrl,
     ]
-      .filter(Boolean)
+      .filter((line) => line !== null && line !== undefined)
       .join("\n");
+  }
+
+  async function getPlanImageFile() {
+    if (!planImageUrl) {
+      throw new Error("Missing plan image URL");
+    }
+
+    const response = await fetch(planImageUrl, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error("Could not load plan image");
+    }
+
+    const blob = await response.blob();
+
+    return new File([blob], `${slug}-plan.png`, {
+      type: "image/png",
+    });
+  }
+
+  async function sharePlanImage() {
+    const shareTitle = plan?.title || "Plan";
+    const message = getShareMessage();
 
     try {
+      const imageFile = await getPlanImageFile();
+
+      if (
+        navigator.share &&
+        navigator.canShare &&
+        navigator.canShare({
+          files: [imageFile],
+        })
+      ) {
+        await navigator.share({
+          title: `${shareTitle} on Popcircle`,
+          text: message,
+          files: [imageFile],
+        });
+
+        return;
+      }
+
       if (navigator.share) {
         await navigator.share({
           title: `${shareTitle} on Popcircle`,
           text: message,
-          url: qrUrl,
         });
 
         return;
@@ -368,14 +416,56 @@ export default function DMClient({ slug }: { slug: string }) {
       await navigator.clipboard.writeText(message);
       alert("Plan copied");
     } catch (error) {
-      console.error("Share failed:", error);
+      console.error("Share image failed:", error);
 
       try {
         await navigator.clipboard.writeText(message);
         alert("Plan copied");
       } catch {
-        alert("Could not copy plan");
+        alert("Could not share plan");
       }
+    }
+  }
+
+  async function copyPlanImage() {
+    try {
+      const imageFile = await getPlanImageFile();
+
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        alert("Copy image is not supported here. Use Download Image instead.");
+        return;
+      }
+
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": imageFile,
+        }),
+      ]);
+
+      alert("Plan image copied");
+    } catch (error) {
+      console.error("Copy image failed:", error);
+      alert("Could not copy image. Use Download Image instead.");
+    }
+  }
+
+  function downloadPlanImage() {
+    if (!planImageUrl) return;
+
+    const link = document.createElement("a");
+    link.href = planImageUrl;
+    link.download = `${slug}-plan.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async function copyPlanText() {
+    try {
+      await navigator.clipboard.writeText(getShareMessage());
+      alert("Plan text copied");
+    } catch {
+      alert("Could not copy plan text");
     }
   }
 
@@ -691,26 +781,62 @@ export default function DMClient({ slug }: { slug: string }) {
       {/* INVITE MODAL */}
       {showInvite && (
         <div
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4"
           onClick={() => setShowInvite(false)}
         >
           <div
-            className="bg-zinc-900 border border-white/10 p-6 rounded-3xl space-y-5"
+            className="w-full max-w-md bg-zinc-900 border border-white/10 p-5 rounded-3xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="bg-white p-3 rounded-2xl">
-              <QRCode value={qrUrl} size={200} />
+            <div className="rounded-2xl overflow-hidden border border-white/10 bg-black">
+              {planImageUrl && (
+                <img
+                  src={planImageUrl}
+                  alt="Plan share card"
+                  className="w-full rounded-2xl"
+                />
+              )}
             </div>
 
-            <button
-              onClick={sharePlan}
-              className="w-full bg-blue-600 text-white py-3 rounded-2xl font-semibold"
-            >
-              Share Plan
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={sharePlanImage}
+                className="bg-blue-600 text-white py-3 rounded-2xl font-semibold"
+              >
+                Share Image
+              </button>
+
+              <button
+                onClick={copyPlanImage}
+                className="bg-zinc-800 text-white py-3 rounded-2xl font-semibold"
+              >
+                Copy Image
+              </button>
+
+              <button
+                onClick={downloadPlanImage}
+                className="col-span-2 bg-white text-black py-3 rounded-2xl font-semibold"
+              >
+                Download Image
+              </button>
+
+              <button
+                onClick={copyPlanText}
+                className="col-span-2 bg-zinc-800 text-white py-3 rounded-2xl font-semibold"
+              >
+                Copy Plan Text
+              </button>
+            </div>
+
+            <div className="flex justify-center pt-1">
+              <div className="bg-white p-3 rounded-2xl">
+                <QRCode value={qrUrl} size={130} />
+              </div>
+            </div>
 
             <p className="text-center text-sm text-zinc-400">
-              Scan or share to invite friends
+              Share the image, download it, or scan the QR code to invite
+              friends.
             </p>
           </div>
         </div>
